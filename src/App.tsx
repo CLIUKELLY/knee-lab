@@ -7,7 +7,7 @@ import * as THREE from "three";
 
 gsap.registerPlugin(ScrollTrigger);
 
-type StructureKey = "all" | "bone" | "meniscus" | "cartilage";
+type StructureKey = "all" | "bone" | "meniscus" | "cartilage" | "ligament" | "muscle";
 
 type Structure = {
   key: StructureKey;
@@ -22,7 +22,7 @@ const structures: Structure[] = [
     key: "all",
     label: "Whole joint",
     eyebrow: "01 / SYSTEM",
-    description: "The knee coordinates bone, cartilage and fibrocartilage to carry load while remaining mobile.",
+    description: "The knee coordinates bone, cartilage, menisci, ligaments, tendons and muscle to carry load while remaining mobile.",
     fact: "It behaves like a modified hinge, combining flexion with small rotations and gliding movements.",
   },
   {
@@ -46,6 +46,20 @@ const structures: Structure[] = [
     description: "Smooth articular cartilage covers contact surfaces so the bones can move with very little friction.",
     fact: "Unlike most tissues, articular cartilage has no direct blood supply.",
   },
+  {
+    key: "ligament",
+    label: "Ligaments",
+    eyebrow: "05 / CONTROL",
+    description: "The cruciate and collateral ligaments guide motion and resist excessive translation and rotation.",
+    fact: "ACL and PCL cross inside the joint; MCL and LCL reinforce its sides. Tendons are shown with this layer.",
+  },
+  {
+    key: "muscle",
+    label: "Muscles",
+    eyebrow: "06 / POWER",
+    description: "Quadriceps extend the knee, while the hamstrings flex it and the gastrocnemius can assist flexion.",
+    fact: "These simplified muscle volumes show relationships, not individual diagnostic anatomy.",
+  },
 ];
 
 const structureByKey = Object.fromEntries(structures.map((item) => [item.key, item])) as Record<
@@ -53,18 +67,172 @@ const structureByKey = Object.fromEntries(structures.map((item) => [item.key, it
   Structure
 >;
 
-const palette: Record<Exclude<StructureKey, "all">, string> = {
+type TissueKey = Exclude<StructureKey, "all">;
+
+const palette: Record<TissueKey, string> = {
   bone: "#ece4d6",
   meniscus: "#8df0c5",
   cartilage: "#61d9ed",
+  ligament: "#f0cf86",
+  muscle: "#db7f78",
 };
 
-function categoryForName(name: string): Exclude<StructureKey, "all"> | null {
+function categoryForName(name: string): TissueKey | null {
   const normalized = name.toLowerCase();
   if (normalized.includes("meniscus")) return "meniscus";
   if (normalized.includes("cartilage")) return "cartilage";
   if (["femur", "tibia", "fibula", "patella"].some((part) => normalized.includes(part))) return "bone";
   return null;
+}
+
+const pivot = new THREE.Vector3(0.155, -0.36, 0);
+
+function rotateLowerPoint(point: THREE.Vector3, flexion: number) {
+  const bend = THREE.MathUtils.degToRad(flexion * -0.58);
+  return point.clone().sub(pivot).applyAxisAngle(new THREE.Vector3(1, 0, 0), bend).add(pivot);
+}
+
+type StrandProps = {
+  name: string;
+  points: [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+  lowerPoint?: boolean;
+  radius?: number;
+  category?: "ligament";
+  selected: StructureKey;
+  xray: boolean;
+  exploded: boolean;
+  flexion: number;
+  onSelect: (key: StructureKey) => void;
+  onHover: (label: string | null) => void;
+};
+
+function SoftStrand({
+  name,
+  points,
+  lowerPoint = true,
+  radius = 0.003,
+  category = "ligament",
+  selected,
+  xray,
+  exploded,
+  flexion,
+  onSelect,
+  onHover,
+}: StrandProps) {
+  const geometry = useMemo(() => {
+    const updated = points.map((point, index) =>
+      lowerPoint && index === points.length - 1 ? rotateLowerPoint(point, flexion) : point.clone(),
+    );
+    if (exploded) updated.forEach((point) => point.add(new THREE.Vector3(0, 0, 0.025)));
+    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(updated), 28, radius, 8, false);
+  }, [exploded, flexion, lowerPoint, points, radius]);
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  const active = selected === "all" || selected === category;
+
+  return (
+    <mesh
+      name={name}
+      geometry={geometry}
+      castShadow
+      onPointerOver={(event) => {
+        event.stopPropagation();
+        document.body.style.cursor = "pointer";
+        onHover(name);
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "default";
+        onHover(null);
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect(category);
+      }}
+    >
+      <meshPhysicalMaterial
+        color={palette[category]}
+        roughness={0.32}
+        clearcoat={0.42}
+        transparent
+        opacity={!active ? 0.055 : xray ? 0.9 : 0.98}
+        depthWrite={active}
+        emissive={active && selected === category ? palette[category] : "#000000"}
+        emissiveIntensity={active && selected === category ? 0.16 : 0}
+      />
+    </mesh>
+  );
+}
+
+type MuscleProps = {
+  name: string;
+  position: [number, number, number];
+  scale: [number, number, number];
+  rotation?: [number, number, number];
+  lower?: boolean;
+} & Pick<KneeModelProps, "selected" | "xray" | "exploded" | "flexion" | "onSelect" | "onHover">;
+
+function MuscleVolume({ name, position, scale, rotation = [0, 0, 0], lower, selected, xray, exploded, flexion, onSelect, onHover }: MuscleProps) {
+  const active = selected === "all" || selected === "muscle";
+  const base = useMemo(() => new THREE.Vector3(...position), [position]);
+  const moved = lower ? rotateLowerPoint(base, flexion) : base;
+  const bend = lower ? THREE.MathUtils.degToRad(flexion * -0.58) : 0;
+  const displayPosition = moved.clone().add(exploded ? new THREE.Vector3(0, 0, -0.035) : new THREE.Vector3());
+
+  return (
+    <mesh
+      name={name}
+      position={displayPosition}
+      scale={scale}
+      rotation={[rotation[0] + bend, rotation[1], rotation[2]]}
+      castShadow
+      onPointerOver={(event) => {
+        event.stopPropagation();
+        document.body.style.cursor = "pointer";
+        onHover(name);
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "default";
+        onHover(null);
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect("muscle");
+      }}
+    >
+      <sphereGeometry args={[1, 28, 18]} />
+      <meshPhysicalMaterial
+        color={palette.muscle}
+        roughness={0.48}
+        clearcoat={0.16}
+        transparent
+        opacity={!active ? 0.04 : xray ? 0.2 : 0.74}
+        depthWrite={active && !xray}
+        emissive={active && selected === "muscle" ? palette.muscle : "#000000"}
+        emissiveIntensity={active && selected === "muscle" ? 0.12 : 0}
+      />
+    </mesh>
+  );
+}
+
+function SoftTissues(props: KneeModelProps) {
+  const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  const strands: Omit<StrandProps, keyof KneeModelProps | "selected" | "xray" | "exploded" | "flexion" | "onSelect" | "onHover">[] = [
+    { name: "ACL · Anterior cruciate ligament", points: [v(0.166, -0.397, -0.032), v(0.148, -0.414, -0.012), v(0.132, -0.438, -0.004)], radius: 0.0034 },
+    { name: "PCL · Posterior cruciate ligament", points: [v(0.128, -0.399, -0.031), v(0.139, -0.419, -0.038), v(0.154, -0.437, -0.031)], radius: 0.0038 },
+    { name: "MCL · Medial collateral ligament", points: [v(0.093, -0.391, -0.018), v(0.091, -0.434, -0.012), v(0.103, -0.502, -0.004)], radius: 0.0031 },
+    { name: "LCL · Lateral collateral ligament", points: [v(0.179, -0.386, -0.021), v(0.192, -0.431, -0.027), v(0.206, -0.471, -0.035)], radius: 0.0028 },
+    { name: "Quadriceps tendon", points: [v(0.145, -0.285, 0.042), v(0.149, -0.324, 0.047), v(0.151, -0.361, 0.045)], lowerPoint: false, radius: 0.0062 },
+    { name: "Patellar tendon", points: [v(0.151, -0.407, 0.044), v(0.153, -0.454, 0.034), v(0.157, -0.505, 0.015)], radius: 0.006 },
+  ];
+
+  return (
+    <group>
+      {strands.map((strand) => <SoftStrand key={strand.name} {...props} {...strand} />)}
+      <MuscleVolume {...props} name="Quadriceps" position={[0.133, -0.17, 0.026]} scale={[0.046, 0.15, 0.035]} rotation={[0.04, 0, -0.04]} />
+      <MuscleVolume {...props} name="Hamstrings" position={[0.126, -0.2, -0.057]} scale={[0.036, 0.15, 0.03]} rotation={[-0.05, 0, 0.08]} />
+      <MuscleVolume {...props} name="Gastrocnemius" position={[0.146, -0.61, -0.068]} scale={[0.05, 0.15, 0.038]} rotation={[0.06, 0, -0.03]} lower />
+    </group>
+  );
 }
 
 function isAnnotation(name: string) {
@@ -134,12 +302,11 @@ function KneeModel({ selected, xray, exploded, flexion, onSelect, onHover }: Kne
     group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, -state.pointer.y * 0.06, ease);
 
     const bend = THREE.MathUtils.degToRad(flexion * -0.58);
-    const pivot = new THREE.Vector3(0.155, -0.36, 0);
-    const pivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(bend, 0, 0)));
+      const pivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(bend, 0, 0)));
 
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh) || !object.visible) return;
-      const category = object.userData.category as Exclude<StructureKey, "all">;
+      const category = object.userData.category as TissueKey;
       const material = object.material as THREE.MeshPhysicalMaterial;
       const active = selected === "all" || selected === category;
       const isLowerLeg = /tibia|fibula/i.test(object.name);
@@ -179,27 +346,29 @@ function KneeModel({ selected, xray, exploded, flexion, onSelect, onHover }: Kne
   return (
     <group ref={group}>
       <Center>
-        <primitive
-          object={model}
-          scale={4.35}
-          onPointerOver={(event: ThreeEvent<PointerEvent>) => {
-            const category = resolveEventCategory(event);
-            if (!category) return;
-            event.stopPropagation();
-            document.body.style.cursor = "pointer";
-            onHover(structureByKey[category].label);
-          }}
-          onPointerOut={() => {
-            document.body.style.cursor = "default";
-            onHover(null);
-          }}
-          onClick={(event: ThreeEvent<MouseEvent>) => {
-            const category = categoryForName(event.object.name);
-            if (!category || isAnnotation(event.object.name)) return;
-            event.stopPropagation();
-            onSelect(category);
-          }}
-        />
+        <group scale={4.35}>
+          <primitive
+            object={model}
+            onPointerOver={(event: ThreeEvent<PointerEvent>) => {
+              const category = resolveEventCategory(event);
+              if (!category) return;
+              event.stopPropagation();
+              document.body.style.cursor = "pointer";
+              onHover(structureByKey[category].label);
+            }}
+            onPointerOut={() => {
+              document.body.style.cursor = "default";
+              onHover(null);
+            }}
+            onClick={(event: ThreeEvent<MouseEvent>) => {
+              const category = categoryForName(event.object.name);
+              if (!category || isAnnotation(event.object.name)) return;
+              event.stopPropagation();
+              onSelect(category);
+            }}
+          />
+          <SoftTissues selected={selected} xray={xray} exploded={exploded} flexion={flexion} onSelect={onSelect} onHover={onHover} />
+        </group>
       </Center>
     </group>
   );
@@ -427,7 +596,7 @@ export default function App() {
         <section id="learn" className="learn-section">
           <div className="learn-heading" data-reveal>
             <p className="kicker">THE SYSTEM</p>
-            <h2>Three materials.<br />One coordinated joint.</h2>
+            <h2>Five tissue systems.<br />One coordinated joint.</h2>
           </div>
           <div className="anatomy-grid">
             {structures.slice(1).map((structure, index) => (
@@ -485,8 +654,8 @@ export default function App() {
         </a>
         <p>Interactive anatomy study by Kelly Liu.</p>
         <div>
-          <a href="https://3d.nih.gov/entries/3DPX-021003" target="_blank" rel="noreferrer">Model credit ↗</a>
-          <span>Educational illustration · Not medical advice</span>
+          <a href="https://3d.nih.gov/entries/3DPX-021003" target="_blank" rel="noreferrer">Sources & model credit ↗</a>
+          <span>Soft tissues are educational reconstructions · Not medical advice</span>
         </div>
       </footer>
     </div>
