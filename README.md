@@ -1,6 +1,6 @@
 # Knee Lab
 
-An interactive, browser-based exploration of knee anatomy built with React, Three.js, and React Three Fiber.
+An interactive, browser-based exploration of knee anatomy built with React, Three.js, and React Three Fiber. It combines an open anatomical reference model with lightweight procedural ligaments, tendons and muscle volumes for real-time exploration.
 
 ## Development
 
