@@ -10,6 +10,8 @@
   --mint: #8df0c5;
   --cyan: #61d9ed;
   --bone: #ece4d6;
+  --ligament: #f0cf86;
+  --muscle: #db7f78;
 }
 
 * { box-sizing: border-box; }
@@ -145,7 +147,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .learn-section { padding: 10vw 6vw 11vw; background: #07100d; }
 .learn-heading { max-width: 1000px; margin-bottom: 7vw; }
 .learn-heading h2 { color: #e7eae3; }
-.anatomy-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.anatomy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
 .anatomy-grid article { min-height: 440px; padding: 28px; display: flex; flex-direction: column; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .material-swatch { position: relative; height: 150px; margin-bottom: 42px; overflow: hidden; background: radial-gradient(circle at 50% 130%, currentColor, transparent 70%); }
 .material-swatch::after { content: ""; position: absolute; width: 80px; height: 80px; top: 34px; left: calc(50% - 40px); border: 1px solid currentColor; border-radius: 50%; box-shadow: 0 0 42px currentColor, inset 0 0 28px currentColor; opacity: .55; }
@@ -153,6 +155,8 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .swatch-bone { color: var(--bone); }
 .swatch-meniscus { color: var(--mint); }
 .swatch-cartilage { color: var(--cyan); }
+.swatch-ligament { color: var(--ligament); }
+.swatch-muscle { color: var(--muscle); }
 .anatomy-grid h3 { margin: 0 0 16px; font-size: 1.7rem; font-weight: 400; letter-spacing: -.03em; }
 .anatomy-grid p { margin: 0; color: #7f8b84; font-size: .86rem; line-height: 1.75; }
 .anatomy-grid button { margin-top: auto; padding: 20px 0 0; color: #a9b5ae; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; cursor: pointer; }
