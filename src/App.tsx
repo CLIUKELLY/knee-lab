@@ -8,6 +8,7 @@ import * as THREE from "three";
 gsap.registerPlugin(ScrollTrigger);
 
 type StructureKey = "all" | "bone" | "meniscus" | "cartilage" | "ligament" | "muscle";
+type AclState = "normal" | "strain" | "tear";
 
 type Structure = {
   key: StructureKey;
@@ -101,7 +102,10 @@ type StrandProps = {
   selected: StructureKey;
   xray: boolean;
   exploded: boolean;
+  explodeAmount?: number;
   flexion: number;
+  tensionMap?: boolean;
+  aclState?: AclState;
   onSelect: (key: StructureKey) => void;
   onHover: (label: string | null) => void;
 };
@@ -115,26 +119,52 @@ function SoftStrand({
   selected,
   xray,
   exploded,
+  explodeAmount,
   flexion,
+  tensionMap = false,
+  aclState = "normal",
   onSelect,
   onHover,
 }: StrandProps) {
-  const geometry = useMemo(() => {
+  const isAcl = name.startsWith("ACL");
+  const isTorn = isAcl && aclState === "tear";
+  const explosion = explodeAmount ?? (exploded ? 1 : 0);
+  const load = useMemo(() => {
+    const progress = flexion / 130;
+    if (name.startsWith("ACL")) return THREE.MathUtils.lerp(0.9, 0.3, Math.min(progress / 0.7, 1));
+    if (name.startsWith("PCL")) return THREE.MathUtils.lerp(0.2, 0.92, progress);
+    if (name.startsWith("MCL")) return 0.42 - progress * 0.12;
+    if (name.startsWith("LCL")) return 0.34 + progress * 0.08;
+    return 0.24;
+  }, [flexion, name]);
+
+  const geometries = useMemo(() => {
     const updated = points.map((point, index) =>
       lowerPoint && index === points.length - 1 ? rotateLowerPoint(point, flexion) : point.clone(),
     );
-    if (exploded) updated.forEach((point) => point.add(new THREE.Vector3(0, 0, 0.025)));
-    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(updated), 28, radius, 8, false);
-  }, [exploded, flexion, lowerPoint, points, radius]);
+    if (isAcl && aclState === "strain") updated[1].add(new THREE.Vector3(0.007, 0, 0.005));
+    if (explosion) updated.forEach((point) => point.add(new THREE.Vector3(0, 0, 0.025 * explosion)));
+    const curve = new THREE.CatmullRomCurve3(updated);
+    if (!isTorn) return [new THREE.TubeGeometry(curve, 28, radius, 8, false)];
+    const first = new THREE.CatmullRomCurve3([curve.getPoint(0), curve.getPoint(0.22), curve.getPoint(0.43)]);
+    const second = new THREE.CatmullRomCurve3([curve.getPoint(0.57), curve.getPoint(0.78), curve.getPoint(1)]);
+    return [
+      new THREE.TubeGeometry(first, 15, radius * 0.88, 8, false),
+      new THREE.TubeGeometry(second, 15, radius * 0.88, 8, false),
+    ];
+  }, [aclState, explosion, flexion, isAcl, isTorn, lowerPoint, points, radius]);
 
-  useEffect(() => () => geometry.dispose(), [geometry]);
+  useEffect(() => () => geometries.forEach((geometry) => geometry.dispose()), [geometries]);
   const active = selected === "all" || selected === category;
+  const heatColor = useMemo(
+    () => new THREE.Color(palette.ligament).lerp(new THREE.Color("#ff456e"), load),
+    [load],
+  );
+  const color = isAcl && aclState !== "normal" ? (aclState === "tear" ? "#ff315f" : "#ff775c") : tensionMap ? heatColor : palette[category];
 
   return (
-    <mesh
+    <group
       name={name}
-      geometry={geometry}
-      castShadow
       onPointerOver={(event) => {
         event.stopPropagation();
         document.body.style.cursor = "pointer";
@@ -149,17 +179,22 @@ function SoftStrand({
         onSelect(category);
       }}
     >
-      <meshPhysicalMaterial
-        color={palette[category]}
-        roughness={0.32}
-        clearcoat={0.42}
-        transparent
-        opacity={!active ? 0.055 : xray ? 0.9 : 0.98}
-        depthWrite={active}
-        emissive={active && selected === category ? palette[category] : "#000000"}
-        emissiveIntensity={active && selected === category ? 0.16 : 0}
-      />
-    </mesh>
+      {geometries.map((geometry, index) => (
+        <mesh key={index} geometry={geometry} castShadow>
+          <meshPhysicalMaterial
+            color={color}
+            roughness={0.32}
+            clearcoat={0.42}
+            transparent
+            opacity={!active ? 0.055 : xray ? 0.9 : 0.98}
+            depthWrite={active}
+            emissive={active && (tensionMap || selected === category || (isAcl && aclState !== "normal")) ? color : "#000000"}
+            emissiveIntensity={active ? (tensionMap ? 0.18 + load * 0.65 : isAcl && aclState !== "normal" ? 0.6 : selected === category ? 0.16 : 0) : 0}
+          />
+        </mesh>
+      ))}
+      {isTorn && active && <Sparkles count={12} position={[0.15, -0.418, -0.01]} scale={0.035} size={1.8} speed={0.8} color="#ff5278" />}
+    </group>
   );
 }
 
@@ -169,14 +204,15 @@ type MuscleProps = {
   scale: [number, number, number];
   rotation?: [number, number, number];
   lower?: boolean;
-} & Pick<KneeModelProps, "selected" | "xray" | "exploded" | "flexion" | "onSelect" | "onHover">;
+} & Pick<KneeModelProps, "selected" | "xray" | "exploded" | "explodeAmount" | "flexion" | "onSelect" | "onHover">;
 
-function MuscleVolume({ name, position, scale, rotation = [0, 0, 0], lower, selected, xray, exploded, flexion, onSelect, onHover }: MuscleProps) {
+function MuscleVolume({ name, position, scale, rotation = [0, 0, 0], lower, selected, xray, exploded, explodeAmount, flexion, onSelect, onHover }: MuscleProps) {
   const active = selected === "all" || selected === "muscle";
   const base = useMemo(() => new THREE.Vector3(...position), [position]);
   const moved = lower ? rotateLowerPoint(base, flexion) : base;
   const bend = lower ? THREE.MathUtils.degToRad(flexion * -0.58) : 0;
-  const displayPosition = moved.clone().add(exploded ? new THREE.Vector3(0, 0, -0.035) : new THREE.Vector3());
+  const explosion = explodeAmount ?? (exploded ? 1 : 0);
+  const displayPosition = moved.clone().add(new THREE.Vector3(0, 0, -0.035 * explosion));
 
   return (
     <mesh
@@ -246,22 +282,69 @@ type KneeModelProps = {
   selected: StructureKey;
   xray: boolean;
   exploded: boolean;
+  explodeAmount?: number;
   flexion: number;
   onSelect: (key: StructureKey) => void;
   onHover: (label: string | null) => void;
   viewRotation?: number;
   showMotionGhost?: boolean;
+  showLabels?: boolean;
+  tensionMap?: boolean;
+  aclState?: AclState;
 };
+
+const labelsByStructure: Record<StructureKey, { label: string; position: [number, number, number] }[]> = {
+  all: [
+    { label: "PATELLA", position: [0.15, -0.38, 0.07] },
+    { label: "ACL", position: [0.15, -0.415, -0.005] },
+    { label: "MENISCI", position: [0.14, -0.44, 0.015] },
+    { label: "TIBIA", position: [0.15, -0.55, 0.01] },
+  ],
+  bone: [
+    { label: "FEMUR", position: [0.14, -0.25, 0] },
+    { label: "PATELLA", position: [0.15, -0.38, 0.07] },
+    { label: "TIBIA", position: [0.15, -0.55, 0.01] },
+  ],
+  meniscus: [{ label: "MEDIAL + LATERAL MENISCI", position: [0.14, -0.44, 0.02] }],
+  cartilage: [{ label: "ARTICULAR CARTILAGE", position: [0.14, -0.415, 0.03] }],
+  ligament: [
+    { label: "ACL", position: [0.15, -0.415, -0.005] },
+    { label: "PCL", position: [0.14, -0.42, -0.04] },
+    { label: "MCL", position: [0.09, -0.44, -0.01] },
+    { label: "LCL", position: [0.195, -0.43, -0.03] },
+  ],
+  muscle: [
+    { label: "QUADRICEPS", position: [0.13, -0.18, 0.04] },
+    { label: "HAMSTRINGS", position: [0.12, -0.22, -0.07] },
+    { label: "GASTROCNEMIUS", position: [0.15, -0.62, -0.07] },
+  ],
+};
+
+function AnatomyLabels({ selected }: { selected: StructureKey }) {
+  return (
+    <group>
+      {labelsByStructure[selected].map((item) => (
+        <Html key={item.label} position={item.position} center sprite distanceFactor={2.5} className="anatomy-label-wrap">
+          <span className="anatomy-label">{item.label}</span>
+        </Html>
+      ))}
+    </group>
+  );
+}
 
 function KneeModel({
   selected,
   xray,
   exploded,
+  explodeAmount,
   flexion,
   onSelect,
   onHover,
   viewRotation = -0.2,
   showMotionGhost = false,
+  showLabels = false,
+  tensionMap = false,
+  aclState = "normal",
 }: KneeModelProps) {
   const group = useRef<THREE.Group>(null);
   const { scene } = useGLTF(`${import.meta.env.BASE_URL}models/knee.glb`);
@@ -298,23 +381,28 @@ function KneeModel({
     return cloned;
   }, [scene]);
 
-  const extensionGhost = useMemo(() => {
-    const cloned = scene.clone(true);
-    cloned.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
-      const isLowerLegBone = /tibia|fibula/i.test(object.name) && !isAnnotation(object.name);
-      object.visible = isLowerLegBone;
-      object.raycast = () => undefined;
-      if (!isLowerLegBone) return;
-      object.material = new THREE.MeshBasicMaterial({
-        color: "#8fb5ff",
-        wireframe: true,
-        transparent: true,
-        opacity: 0.12,
-        depthWrite: false,
+  const motionGhosts = useMemo(() => {
+    return [0, 0.34, 0.68].map((trailProgress) => {
+      const cloned = scene.clone(true);
+      cloned.userData.trailProgress = trailProgress;
+      cloned.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        const isLowerLegBone = /tibia|fibula/i.test(object.name) && !isAnnotation(object.name);
+        object.visible = isLowerLegBone;
+        object.raycast = () => undefined;
+        object.userData.basePosition = object.position.clone();
+        object.userData.baseRotation = object.rotation.clone();
+        if (!isLowerLegBone) return;
+        object.material = new THREE.MeshBasicMaterial({
+          color: trailProgress === 0 ? "#9fbaff" : "#6ae0ff",
+          wireframe: true,
+          transparent: true,
+          opacity: 0.08,
+          depthWrite: false,
+        });
       });
+      return cloned;
     });
-    return cloned;
   }, [scene]);
 
   useEffect(() => {
@@ -322,11 +410,11 @@ function KneeModel({
       model.traverse((object) => {
         if (object instanceof THREE.Mesh) object.material.dispose();
       });
-      extensionGhost.traverse((object) => {
+      motionGhosts.forEach((ghost) => ghost.traverse((object) => {
         if (object instanceof THREE.Mesh && object.visible) object.material.dispose();
-      });
+      }));
     };
-  }, [extensionGhost, model]);
+  }, [model, motionGhosts]);
 
   useFrame((state, delta) => {
     if (!group.current) return;
@@ -341,15 +429,22 @@ function KneeModel({
     const bend = THREE.MathUtils.degToRad(flexion * -0.58);
     const pivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(bend, 0, 0)));
 
-    extensionGhost.visible = showMotionGhost && flexion > 4;
-    extensionGhost.traverse((object) => {
-      if (!(object instanceof THREE.Mesh) || !object.visible) return;
-      (object.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.lerp(
-        (object.material as THREE.MeshBasicMaterial).opacity,
-        0.055 + (flexion / 130) * 0.12,
-        ease,
-      );
+    motionGhosts.forEach((ghost) => {
+      const trailProgress = ghost.userData.trailProgress as number;
+      ghost.visible = showMotionGhost && flexion > 4;
+      const trailBend = bend * trailProgress;
+      const trailPivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(trailBend, 0, 0)));
+      ghost.traverse((object) => {
+        if (!(object instanceof THREE.Mesh) || !object.visible) return;
+        const basePosition = object.userData.basePosition as THREE.Vector3;
+        const baseRotation = object.userData.baseRotation as THREE.Euler;
+        object.position.copy(basePosition).add(trailPivotShift);
+        object.rotation.x = baseRotation.x + trailBend;
+        (object.material as THREE.MeshBasicMaterial).opacity = 0.04 + (1 - trailProgress) * 0.08 + (flexion / 130) * 0.04;
+      });
     });
+
+    const explosion = explodeAmount ?? (exploded ? 1 : 0);
 
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh) || !object.visible) return;
@@ -361,13 +456,13 @@ function KneeModel({
       const baseRotation = object.userData.baseRotation as THREE.Euler;
       const targetPosition = basePosition.clone();
 
-      if (exploded) {
-        if (/femur/i.test(object.name)) targetPosition.x -= 0.12;
-        if (/tibia/i.test(object.name)) targetPosition.x += 0.12;
-        if (/fibula/i.test(object.name)) targetPosition.x += 0.24;
-        if (/patella/i.test(object.name)) targetPosition.z += 0.18;
-        if (category === "meniscus") targetPosition.x += 0.06;
-        if (category === "cartilage") targetPosition.x -= 0.04;
+      if (explosion) {
+        if (/femur/i.test(object.name)) targetPosition.x -= 0.12 * explosion;
+        if (/tibia/i.test(object.name)) targetPosition.x += 0.12 * explosion;
+        if (/fibula/i.test(object.name)) targetPosition.x += 0.24 * explosion;
+        if (/patella/i.test(object.name)) targetPosition.z += 0.18 * explosion;
+        if (category === "meniscus") targetPosition.x += 0.06 * explosion;
+        if (category === "cartilage") targetPosition.x -= 0.04 * explosion;
       }
 
       if (isLowerLeg) targetPosition.add(pivotShift);
@@ -394,7 +489,7 @@ function KneeModel({
     <group ref={group} rotation={[0, viewRotation, 0]}>
       <Center>
         <group scale={4.35}>
-          {showMotionGhost && <primitive object={extensionGhost} />}
+          {showMotionGhost && motionGhosts.map((ghost, index) => <primitive key={index} object={ghost} />)}
           <primitive
             object={model}
             onPointerOver={(event: ThreeEvent<PointerEvent>) => {
@@ -415,7 +510,18 @@ function KneeModel({
               onSelect(category);
             }}
           />
-          <SoftTissues selected={selected} xray={xray} exploded={exploded} flexion={flexion} onSelect={onSelect} onHover={onHover} />
+          <SoftTissues
+            selected={selected}
+            xray={xray}
+            exploded={exploded}
+            explodeAmount={explodeAmount}
+            flexion={flexion}
+            tensionMap={tensionMap}
+            aclState={aclState}
+            onSelect={onSelect}
+            onHover={onHover}
+          />
+          {showLabels && <AnatomyLabels selected={selected} />}
         </group>
       </Center>
     </group>
@@ -492,7 +598,14 @@ export default function App() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [quizAnswer, setQuizAnswer] = useState<boolean | null>(null);
   const [motionViewKey, setMotionViewKey] = useState(0);
+  const [showLabels, setShowLabels] = useState(true);
+  const [tensionMap, setTensionMap] = useState(false);
+  const [aclState, setAclState] = useState<AclState>("normal");
+  const [layerProgress, setLayerProgress] = useState(0);
   const active = structureByKey[selected];
+  const layerStructures = structures.slice(1);
+  const layerIndex = Math.min(layerStructures.length - 1, Math.floor(layerProgress * layerStructures.length));
+  const layerSelected = layerStructures[layerIndex].key;
 
   useLayoutEffect(() => {
     const context = gsap.context(() => {
@@ -508,6 +621,13 @@ export default function App() {
             scrollTrigger: { trigger: element, start: "top 86%", once: true },
           },
         );
+      });
+      ScrollTrigger.create({
+        trigger: ".layer-explorer",
+        start: "top 72%",
+        end: "bottom 32%",
+        scrub: true,
+        onUpdate: (self) => setLayerProgress(Math.round(self.progress * 100) / 100),
       });
     }, root);
     return () => context.revert();
@@ -640,9 +760,12 @@ export default function App() {
                   onHover={setHovered}
                   viewRotation={-Math.PI / 2}
                   showMotionGhost
+                  showLabels={showLabels}
+                  tensionMap={tensionMap}
+                  aclState={aclState}
                 />
                 <div className="motion-scan-beam" aria-hidden="true" />
-                {flexion > 4 && <div className="motion-ghost-key" aria-hidden="true"><i /> Extension reference</div>}
+                {flexion > 4 && <div className="motion-ghost-key" aria-hidden="true"><i /> Motion trail · extension reference</div>}
                 <div className="angle-guide" aria-hidden="true">
                   <span>{flexion}°</span>
                 </div>
@@ -694,7 +817,47 @@ export default function App() {
                 <button type="button" className={exploded ? "active" : ""} onClick={() => setExploded((value) => !value)}>
                   <Icon name="layers" /> Explode
                 </button>
+                <button type="button" className={showLabels ? "active" : ""} onClick={() => setShowLabels((value) => !value)}>
+                  + Labels
+                </button>
+                <button type="button" className={tensionMap ? "active tension-active" : ""} onClick={() => setTensionMap((value) => !value)}>
+                  ◉ Tension map
+                </button>
               </div>
+
+              <div className="injury-lab">
+                <div className="injury-head">
+                  <p>ACL INJURY MODE</p>
+                  <span>ILLUSTRATIVE</span>
+                </div>
+                <div className="injury-options" role="group" aria-label="Choose an illustrative ACL condition">
+                  {(["normal", "strain", "tear"] as AclState[]).map((state) => (
+                    <button
+                      key={state}
+                      type="button"
+                      className={aclState === state ? `active is-${state}` : ""}
+                      onClick={() => {
+                        setAclState(state);
+                        setSelected("ligament");
+                      }}
+                    >
+                      {state}
+                    </button>
+                  ))}
+                </div>
+                <p className="injury-note">
+                  {aclState === "normal" && "Continuous ACL fibres guide anterior stability."}
+                  {aclState === "strain" && "Elongation is exaggerated to make fibre stress visible."}
+                  {aclState === "tear" && "A visible gap represents loss of fibre continuity."}
+                </p>
+              </div>
+
+              {tensionMap && (
+                <div className="tension-legend">
+                  <span>LOW</span><i aria-hidden="true" /><span>HIGH</span>
+                  <p>Colour shows a flexion-based trend only, not measured force. Real loading depends on combined forces and movement.</p>
+                </div>
+              )}
 
               <p className="motion-state">
                 <span>{flexion < 15 ? "Near full extension" : flexion < 70 ? "Functional flexion" : "Deep flexion"}</span>
@@ -709,25 +872,47 @@ export default function App() {
             <p className="kicker">THE SYSTEM</p>
             <h2>Five tissue systems.<br />One coordinated joint.</h2>
           </div>
-          <div className="anatomy-grid">
-            {structures.slice(1).map((structure, index) => (
-              <article key={structure.key} data-reveal>
-                <div className={`material-swatch swatch-${structure.key}`}>
-                  <span>0{index + 1}</span>
+          <div className="layer-explorer">
+            <div className="layer-sticky" aria-label="Scroll-driven exploded knee anatomy">
+              <div className="layer-scene">
+                <Scene
+                  selected={layerSelected}
+                  xray={false}
+                  exploded={false}
+                  explodeAmount={layerProgress}
+                  flexion={0}
+                  onSelect={setSelected}
+                  onHover={setHovered}
+                  viewRotation={-0.55}
+                  showLabels
+                />
+                <div className="layer-hud">
+                  <span>EXPLODED ANATOMY</span>
+                  <strong>{String(Math.round(layerProgress * 100)).padStart(3, "0")}%</strong>
                 </div>
-                <h3>{structure.label}</h3>
-                <p>{structure.description}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelected(structure.key);
-                    document.getElementById("explore")?.scrollIntoView({ behavior: "smooth" });
-                  }}
-                >
-                  View in model <span aria-hidden="true">↗</span>
-                </button>
-              </article>
-            ))}
+                <div className="layer-progress"><i style={{ height: `${layerProgress * 100}%` }} /></div>
+              </div>
+            </div>
+            <div className="anatomy-grid">
+              {layerStructures.map((structure, index) => (
+                <article key={structure.key} className={layerSelected === structure.key ? "is-current" : ""}>
+                  <div className={`material-swatch swatch-${structure.key}`}>
+                    <span>0{index + 1}</span>
+                  </div>
+                  <h3>{structure.label}</h3>
+                  <p>{structure.description}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelected(structure.key);
+                      document.getElementById("explore")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                  >
+                    View in model <span aria-hidden="true">↗</span>
+                  </button>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
