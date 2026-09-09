@@ -88,6 +88,69 @@ function categoryForName(name: string): TissueKey | null {
 
 const pivot = new THREE.Vector3(0.155, -0.36, 0);
 
+type TissueTextureKind = "ligament" | "muscle" | "bone" | "cartilage" | "meniscus";
+
+function tissueNoise(x: number, y: number) {
+  const value = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function createTissueTexture(kind: TissueTextureKind) {
+  const width = 160;
+  const height = 96;
+  const data = new Uint8Array(width * height * 4);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const noise = tissueNoise(x, y);
+      let value = 235;
+
+      if (kind === "ligament") {
+        const longFibre = Math.pow(0.5 + 0.5 * Math.cos(y * 1.55 + Math.sin(x * 0.07) * 0.7), 4);
+        const fibril = Math.pow(0.5 + 0.5 * Math.cos(y * 4.9 + x * 0.025), 10);
+        value = 184 + longFibre * 48 + fibril * 20 + noise * 5;
+      } else if (kind === "muscle") {
+        const fascicle = Math.pow(0.5 + 0.5 * Math.cos(x * 1.12 + Math.sin(y * 0.08)), 5);
+        const crossBand = 0.5 + 0.5 * Math.cos(y * 0.72);
+        value = 178 + fascicle * 48 + crossBand * 17 + noise * 7;
+      } else if (kind === "bone") {
+        const pore = noise > 0.93 ? -42 : noise * 16;
+        value = 220 + pore;
+      } else if (kind === "meniscus") {
+        const lamella = 0.5 + 0.5 * Math.cos(y * 0.42 + Math.sin(x * 0.12));
+        value = 202 + lamella * 35 + noise * 8;
+      } else {
+        const glide = 0.5 + 0.5 * Math.sin(x * 0.08 + y * 0.05);
+        value = 226 + glide * 18 + noise * 3;
+      }
+
+      const channel = Math.round(THREE.MathUtils.clamp(value, 130, 255));
+      const index = (y * width + x) * 4;
+      data[index] = channel;
+      data[index + 1] = channel;
+      data[index + 2] = channel;
+      data[index + 3] = 255;
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+  texture.needsUpdate = true;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.anisotropy = 8;
+  const repeat: Record<TissueTextureKind, [number, number]> = {
+    ligament: [2.4, 2.2],
+    muscle: [4.5, 2.8],
+    bone: [5, 7],
+    cartilage: [2, 3],
+    meniscus: [3.5, 2.5],
+  };
+  texture.repeat.set(...repeat[kind]);
+  return texture;
+}
+
 function rotateLowerPoint(point: THREE.Vector3, flexion: number) {
   const bend = THREE.MathUtils.degToRad(flexion * -0.58);
   return point.clone().sub(pivot).applyAxisAngle(new THREE.Vector3(1, 0, 0), bend).add(pivot);
@@ -154,8 +217,52 @@ function SoftStrand({
     ];
   }, [aclState, explosion, flexion, isAcl, isTorn, lowerPoint, points, radius]);
 
+  const fascicleGeometries = useMemo(() => {
+    const offsets = [
+      new THREE.Vector3(-radius * 0.34, 0, 0),
+      new THREE.Vector3(radius * 0.34, 0, 0),
+      new THREE.Vector3(0, 0, -radius * 0.3),
+      new THREE.Vector3(0, 0, radius * 0.3),
+    ];
+
+    return offsets.flatMap((offset, offsetIndex) => {
+      const updated = points.map((point, index) => {
+        const moved = lowerPoint && index === points.length - 1 ? rotateLowerPoint(point, flexion) : point.clone();
+        const taper = 0.72 + Math.sin((index + offsetIndex) * 1.7) * 0.16;
+        return moved.add(offset.clone().multiplyScalar(taper));
+      });
+      if (isAcl && aclState === "strain") updated[1].add(new THREE.Vector3(0.007, 0, 0.005));
+      if (explosion) updated.forEach((point) => point.add(new THREE.Vector3(0, 0, 0.025 * explosion)));
+      const curve = new THREE.CatmullRomCurve3(updated);
+      const fibreRadius = Math.max(radius * 0.105, 0.00034);
+      if (!isTorn) return [new THREE.TubeGeometry(curve, 24, fibreRadius, 5, false)];
+      return [
+        new THREE.TubeGeometry(
+          new THREE.CatmullRomCurve3([curve.getPoint(0), curve.getPoint(0.24), curve.getPoint(0.42)]),
+          12,
+          fibreRadius,
+          5,
+          false,
+        ),
+        new THREE.TubeGeometry(
+          new THREE.CatmullRomCurve3([curve.getPoint(0.58), curve.getPoint(0.76), curve.getPoint(1)]),
+          12,
+          fibreRadius,
+          5,
+          false,
+        ),
+      ];
+    });
+  }, [aclState, explosion, flexion, isAcl, isTorn, lowerPoint, points, radius]);
+
   useEffect(() => () => geometries.forEach((geometry) => geometry.dispose()), [geometries]);
+  useEffect(() => () => fascicleGeometries.forEach((geometry) => geometry.dispose()), [fascicleGeometries]);
   const active = selected === "all" || selected === category;
+  const fibreTexture = useMemo(() => createTissueTexture("ligament"), []);
+  useEffect(() => () => fibreTexture.dispose(), [fibreTexture]);
+  useFrame((state) => {
+    fibreTexture.offset.x = tensionMap ? state.clock.elapsedTime * (0.012 + load * 0.018) : 0;
+  });
   const heatColor = useMemo(
     () => new THREE.Color(palette.ligament).lerp(new THREE.Color("#ff456e"), load),
     [load],
@@ -183,13 +290,36 @@ function SoftStrand({
         <mesh key={index} geometry={geometry} castShadow>
           <meshPhysicalMaterial
             color={color}
-            roughness={0.32}
-            clearcoat={0.42}
+            map={fibreTexture}
+            bumpMap={fibreTexture}
+            bumpScale={0.0011}
+            roughness={0.46}
+            clearcoat={0.18}
+            sheen={0.72}
+            sheenColor="#fff3d6"
+            sheenRoughness={0.54}
             transparent
             opacity={!active ? 0.055 : xray ? 0.9 : 0.98}
             depthWrite={active}
             emissive={active && (tensionMap || selected === category || (isAcl && aclState !== "normal")) ? color : "#000000"}
             emissiveIntensity={active ? (tensionMap ? 0.18 + load * 0.65 : isAcl && aclState !== "normal" ? 0.6 : selected === category ? 0.16 : 0) : 0}
+          />
+        </mesh>
+      ))}
+      {fascicleGeometries.map((geometry, index) => (
+        <mesh key={`fascicle-${index}`} geometry={geometry}>
+          <meshPhysicalMaterial
+            color={color}
+            map={fibreTexture}
+            roughness={0.5}
+            sheen={0.9}
+            sheenColor="#fff9e8"
+            sheenRoughness={0.4}
+            transparent
+            opacity={!active ? 0 : xray ? 0.36 : 0.58}
+            depthWrite={false}
+            emissive={tensionMap || (isAcl && aclState !== "normal") ? color : "#000000"}
+            emissiveIntensity={tensionMap ? 0.22 + load * 0.42 : isAcl && aclState !== "normal" ? 0.3 : 0}
           />
         </mesh>
       ))}
@@ -213,6 +343,8 @@ function MuscleVolume({ name, position, scale, rotation = [0, 0, 0], lower, sele
   const bend = lower ? THREE.MathUtils.degToRad(flexion * -0.58) : 0;
   const explosion = explodeAmount ?? (exploded ? 1 : 0);
   const displayPosition = moved.clone().add(new THREE.Vector3(0, 0, -0.035 * explosion));
+  const muscleTexture = useMemo(() => createTissueTexture("muscle"), []);
+  useEffect(() => () => muscleTexture.dispose(), [muscleTexture]);
 
   return (
     <mesh
@@ -238,8 +370,14 @@ function MuscleVolume({ name, position, scale, rotation = [0, 0, 0], lower, sele
       <sphereGeometry args={[1, 28, 18]} />
       <meshPhysicalMaterial
         color={palette.muscle}
-        roughness={0.48}
-        clearcoat={0.16}
+        map={muscleTexture}
+        bumpMap={muscleTexture}
+        bumpScale={0.035}
+        roughness={0.6}
+        clearcoat={0.08}
+        sheen={0.65}
+        sheenColor="#ffc0b4"
+        sheenRoughness={0.7}
         transparent
         opacity={!active ? 0.04 : xray ? 0.2 : 0.74}
         depthWrite={active && !xray}
@@ -348,6 +486,16 @@ function KneeModel({
 }: KneeModelProps) {
   const group = useRef<THREE.Group>(null);
   const { scene } = useGLTF(`${import.meta.env.BASE_URL}models/knee.glb`);
+  const surfaceTextures = useMemo(
+    () => ({
+      bone: createTissueTexture("bone"),
+      meniscus: createTissueTexture("meniscus"),
+      cartilage: createTissueTexture("cartilage"),
+      ligament: createTissueTexture("ligament"),
+      muscle: createTissueTexture("muscle"),
+    }),
+    [],
+  );
 
   const model = useMemo(() => {
     const cloned = scene.clone(true);
@@ -368,18 +516,26 @@ function KneeModel({
 
       object.material = new THREE.MeshPhysicalMaterial({
         color: palette[category],
-        roughness: category === "bone" ? 0.38 : 0.22,
+        map: surfaceTextures[category],
+        bumpMap: surfaceTextures[category],
+        bumpScale: category === "bone" ? 0.00055 : category === "meniscus" ? 0.00034 : 0.00012,
+        roughness: category === "bone" ? 0.48 : category === "meniscus" ? 0.34 : 0.16,
         metalness: 0,
-        clearcoat: category === "bone" ? 0.15 : 0.55,
-        clearcoatRoughness: 0.32,
-        transmission: category === "bone" ? 0 : 0.08,
+        clearcoat: category === "bone" ? 0.12 : 0.68,
+        clearcoatRoughness: category === "cartilage" ? 0.14 : 0.3,
+        transmission: category === "bone" ? 0 : category === "cartilage" ? 0.16 : 0.06,
+        thickness: category === "cartilage" ? 0.025 : 0.008,
+        ior: category === "cartilage" ? 1.42 : 1.5,
+        sheen: category === "meniscus" ? 0.42 : 0.12,
+        sheenColor: new THREE.Color(category === "meniscus" ? "#dbe3ff" : "#ffffff"),
+        sheenRoughness: 0.6,
         transparent: true,
         opacity: category === "cartilage" ? 0.72 : 0.98,
         side: THREE.DoubleSide,
       });
     });
     return cloned;
-  }, [scene]);
+  }, [scene, surfaceTextures]);
 
   const motionGhosts = useMemo(() => {
     return [0, 0.34, 0.68].map((trailProgress) => {
@@ -413,8 +569,9 @@ function KneeModel({
       motionGhosts.forEach((ghost) => ghost.traverse((object) => {
         if (object instanceof THREE.Mesh && object.visible) object.material.dispose();
       }));
+      Object.values(surfaceTextures).forEach((texture) => texture.dispose());
     };
-  }, [model, motionGhosts]);
+  }, [model, motionGhosts, surfaceTextures]);
 
   useFrame((state, delta) => {
     if (!group.current) return;
