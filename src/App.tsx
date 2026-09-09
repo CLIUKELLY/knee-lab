@@ -9,6 +9,7 @@ gsap.registerPlugin(ScrollTrigger);
 
 type StructureKey = "all" | "bone" | "meniscus" | "cartilage" | "ligament" | "muscle";
 type AclState = "normal" | "strain" | "tear";
+type MuscleScope = "knee" | "regional";
 
 type Structure = {
   key: StructureKey;
@@ -336,6 +337,7 @@ type MusclePath = {
   color: string;
   pennation: number;
   lowerMode?: "distal" | "all";
+  scope?: "regional";
 };
 
 const musclePaths: MusclePath[] = [
@@ -372,21 +374,57 @@ const musclePaths: MusclePath[] = [
     pennation: 0.16,
   },
   {
-    name: "Biceps femoris",
-    points: [[0.185, -0.025, -0.052], [0.194, -0.15, -0.062], [0.198, -0.31, -0.055], [0.206, -0.47, -0.034]],
-    radius: 0.027,
+    name: "Biceps femoris · long head",
+    points: [[0.18, -0.015, -0.06], [0.19, -0.15, -0.07], [0.198, -0.31, -0.058], [0.206, -0.47, -0.034]],
+    radius: 0.024,
     depth: 0.72,
     color: "#b85b60",
     pennation: -0.24,
     lowerMode: "distal",
   },
   {
-    name: "Semitendinosus + semimembranosus",
-    points: [[0.112, -0.03, -0.06], [0.102, -0.16, -0.072], [0.099, -0.31, -0.06], [0.104, -0.5, -0.018]],
-    radius: 0.025,
-    depth: 0.7,
-    color: "#ad565e",
+    name: "Biceps femoris · short head",
+    points: [[0.185, -0.12, -0.045], [0.195, -0.22, -0.052], [0.201, -0.34, -0.048], [0.206, -0.47, -0.034]],
+    radius: 0.017,
+    depth: 0.66,
+    color: "#a85159",
+    pennation: 0.3,
+    lowerMode: "distal",
+  },
+  {
+    name: "Semitendinosus",
+    points: [[0.116, -0.015, -0.058], [0.107, -0.15, -0.073], [0.1, -0.31, -0.058], [0.104, -0.51, -0.008]],
+    radius: 0.019,
+    depth: 0.68,
+    color: "#b15a61",
     pennation: 0.2,
+    lowerMode: "distal",
+  },
+  {
+    name: "Semimembranosus",
+    points: [[0.102, -0.02, -0.075], [0.094, -0.15, -0.086], [0.096, -0.3, -0.076], [0.108, -0.452, -0.045]],
+    radius: 0.022,
+    depth: 0.73,
+    color: "#9f4d57",
+    pennation: -0.14,
+    lowerMode: "distal",
+  },
+  {
+    name: "Sartorius",
+    points: [[0.192, -0.01, 0.038], [0.171, -0.15, 0.042], [0.138, -0.32, 0.027], [0.104, -0.51, 0.004]],
+    radius: 0.007,
+    depth: 0.52,
+    color: "#d9877e",
+    pennation: 0.06,
+    lowerMode: "distal",
+  },
+  {
+    name: "Gracilis",
+    points: [[0.084, -0.01, -0.005], [0.084, -0.18, -0.009], [0.091, -0.35, -0.006], [0.104, -0.505, 0.001]],
+    radius: 0.0075,
+    depth: 0.56,
+    color: "#c77670",
+    pennation: 0.05,
     lowerMode: "distal",
   },
   {
@@ -406,6 +444,65 @@ const musclePaths: MusclePath[] = [
     color: "#bd615f",
     pennation: -0.28,
     lowerMode: "all",
+  },
+  {
+    name: "Popliteus",
+    points: [[0.178, -0.39, -0.035], [0.163, -0.415, -0.05], [0.145, -0.445, -0.058], [0.128, -0.475, -0.055]],
+    radius: 0.009,
+    depth: 0.58,
+    color: "#a65057",
+    pennation: 0.46,
+    lowerMode: "distal",
+  },
+  {
+    name: "Plantaris",
+    points: [[0.183, -0.375, -0.06], [0.19, -0.43, -0.075], [0.18, -0.56, -0.082], [0.17, -0.73, -0.068]],
+    radius: 0.0055,
+    depth: 0.55,
+    color: "#c27a72",
+    pennation: -0.12,
+    lowerMode: "all",
+    scope: "regional",
+  },
+  {
+    name: "Soleus",
+    points: [[0.15, -0.465, -0.065], [0.15, -0.55, -0.08], [0.15, -0.67, -0.078], [0.15, -0.78, -0.06]],
+    radius: 0.037,
+    depth: 0.72,
+    color: "#b85f5c",
+    pennation: 0.38,
+    lowerMode: "all",
+    scope: "regional",
+  },
+  {
+    name: "Tibialis anterior",
+    points: [[0.174, -0.465, 0.026], [0.181, -0.55, 0.042], [0.177, -0.67, 0.045], [0.17, -0.78, 0.036]],
+    radius: 0.017,
+    depth: 0.67,
+    color: "#cf746b",
+    pennation: -0.22,
+    lowerMode: "all",
+    scope: "regional",
+  },
+  {
+    name: "Fibularis longus",
+    points: [[0.205, -0.475, -0.004], [0.214, -0.555, -0.014], [0.21, -0.675, -0.021], [0.201, -0.78, -0.017]],
+    radius: 0.013,
+    depth: 0.62,
+    color: "#bd655f",
+    pennation: 0.2,
+    lowerMode: "all",
+    scope: "regional",
+  },
+  {
+    name: "Extensor digitorum longus",
+    points: [[0.19, -0.48, 0.018], [0.198, -0.56, 0.028], [0.195, -0.68, 0.03], [0.188, -0.78, 0.024]],
+    radius: 0.011,
+    depth: 0.6,
+    color: "#c96d66",
+    pennation: -0.18,
+    lowerMode: "all",
+    scope: "regional",
   },
 ];
 
@@ -562,7 +659,9 @@ function SoftTissues(props: KneeModelProps) {
   return (
     <group>
       {strands.map((strand) => <SoftStrand key={strand.name} {...props} {...strand} />)}
-      {musclePaths.map((muscle) => <MuscleBundle key={muscle.name} {...props} muscle={muscle} />)}
+      {musclePaths
+        .filter((muscle) => muscle.scope !== "regional" || props.muscleScope === "regional")
+        .map((muscle) => <MuscleBundle key={muscle.name} {...props} muscle={muscle} />)}
     </group>
   );
 }
@@ -587,6 +686,7 @@ type KneeModelProps = {
   showLabels?: boolean;
   tensionMap?: boolean;
   aclState?: AclState;
+  muscleScope?: MuscleScope;
 };
 
 const labelsByStructure: Record<StructureKey, { label: string; position: [number, number, number] }[]> = {
@@ -618,10 +718,18 @@ const labelsByStructure: Record<StructureKey, { label: string; position: [number
   ],
 };
 
-function AnatomyLabels({ selected }: { selected: StructureKey }) {
+function AnatomyLabels({ selected, muscleScope }: { selected: StructureKey; muscleScope: MuscleScope }) {
+  const labels = selected === "muscle" && muscleScope === "regional"
+    ? [
+        ...labelsByStructure.muscle,
+        { label: "SOLEUS", position: [0.15, -0.66, -0.105] as [number, number, number] },
+        { label: "TIBIALIS ANTERIOR", position: [0.18, -0.62, 0.065] as [number, number, number] },
+        { label: "FIBULARIS LONGUS", position: [0.215, -0.59, -0.01] as [number, number, number] },
+      ]
+    : labelsByStructure[selected];
   return (
     <group>
-      {labelsByStructure[selected].map((item) => (
+      {labels.map((item) => (
         <Html key={item.label} position={item.position} center sprite distanceFactor={2.5} className="anatomy-label-wrap">
           <span className="anatomy-label">{item.label}</span>
         </Html>
@@ -643,6 +751,7 @@ function KneeModel({
   showLabels = false,
   tensionMap = false,
   aclState = "normal",
+  muscleScope = "knee",
 }: KneeModelProps) {
   const group = useRef<THREE.Group>(null);
   const { scene } = useGLTF(`${import.meta.env.BASE_URL}models/knee.glb`);
@@ -835,10 +944,11 @@ function KneeModel({
             flexion={flexion}
             tensionMap={tensionMap}
             aclState={aclState}
+            muscleScope={muscleScope}
             onSelect={onSelect}
             onHover={onHover}
           />
-          {showLabels && <AnatomyLabels selected={selected} />}
+          {showLabels && <AnatomyLabels selected={selected} muscleScope={muscleScope} />}
         </group>
       </Center>
     </group>
@@ -918,6 +1028,7 @@ export default function App() {
   const [showLabels, setShowLabels] = useState(true);
   const [tensionMap, setTensionMap] = useState(false);
   const [aclState, setAclState] = useState<AclState>("normal");
+  const [muscleScope, setMuscleScope] = useState<MuscleScope>("knee");
   const [layerProgress, setLayerProgress] = useState(0);
   const active = structureByKey[selected];
   const layerStructures = structures.slice(1);
@@ -998,6 +1109,7 @@ export default function App() {
               xray={xray}
               exploded={exploded}
               flexion={flexion}
+              muscleScope={muscleScope}
               onSelect={setSelected}
               onHover={setHovered}
             />
@@ -1012,6 +1124,12 @@ export default function App() {
             <div className="panel-rule" />
             <p className="panel-description">{active.description}</p>
             <p className="panel-fact">{active.fact}</p>
+            {selected === "muscle" && (
+              <div className="origin-disclaimer">
+                <span>PROXIMAL PATHS ARE CROPPED</span>
+                <p>Rectus femoris continues to the pelvis; biceps femoris long head, semitendinosus and semimembranosus continue to the ischial tuberosity.</p>
+              </div>
+            )}
           </aside>
 
           <div className="structure-tabs" role="group" aria-label="Choose anatomical layer">
@@ -1039,6 +1157,15 @@ export default function App() {
             >
               <Icon name="layers" /> Explode
             </button>
+            {selected === "muscle" && (
+              <button
+                type="button"
+                className={muscleScope === "regional" ? "active" : ""}
+                onClick={() => setMuscleScope((value) => value === "knee" ? "regional" : "knee")}
+              >
+                {muscleScope === "regional" ? "Regional on" : "Regional"}
+              </button>
+            )}
           </div>
           <div className="scanner" aria-hidden="true" />
         </section>
@@ -1073,6 +1200,7 @@ export default function App() {
                   xray={xray}
                   exploded={exploded}
                   flexion={flexion}
+                  muscleScope={muscleScope}
                   onSelect={setSelected}
                   onHover={setHovered}
                   viewRotation={-Math.PI / 2}
@@ -1142,6 +1270,24 @@ export default function App() {
                 </button>
               </div>
 
+              {selected === "muscle" && (
+                <div className="muscle-scope-control">
+                  <div className="injury-head">
+                    <p>MUSCLE SCOPE</p>
+                    <span>ANATOMY LAYER</span>
+                  </div>
+                  <div className="scope-options" role="group" aria-label="Choose muscle display scope">
+                    <button type="button" className={muscleScope === "knee" ? "active" : ""} onClick={() => setMuscleScope("knee")}>Knee mechanics</button>
+                    <button type="button" className={muscleScope === "regional" ? "active" : ""} onClick={() => setMuscleScope("regional")}>Regional anatomy</button>
+                  </div>
+                  <p>
+                    {muscleScope === "knee"
+                      ? "Shows muscles that cross or directly control the knee. Upper paths continue beyond this cropped model."
+                      : "Adds proximal lower-leg muscles for regional completeness; several primarily act on the ankle."}
+                  </p>
+                </div>
+              )}
+
               <div className="injury-lab">
                 <div className="injury-head">
                   <p>ACL INJURY MODE</p>
@@ -1198,6 +1344,7 @@ export default function App() {
                   exploded={false}
                   explodeAmount={layerProgress}
                   flexion={0}
+                  muscleScope={muscleScope}
                   onSelect={setSelected}
                   onHover={setHovered}
                   viewRotation={-0.55}
