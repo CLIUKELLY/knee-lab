@@ -144,8 +144,14 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .motion-visual-head { position: absolute; z-index: 5; inset: 0 0 auto; height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; color: rgba(224,229,255,.5); border-bottom: 1px solid rgba(192,207,255,.12); font: .7rem "SFMono-Regular", Consolas, monospace; letter-spacing: .1em; }
 .motion-visual-head span:first-child { color: var(--mint); }
 .motion-visual-head i { display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 12px var(--mint); animation: live-pulse 1.8s ease-in-out infinite; }
-.motion-canvas { position: absolute; inset: 52px 0 0; }
+.motion-visual-head button { padding: 7px 10px; color: rgba(224,229,255,.58); border: 1px solid rgba(143,181,255,.2); background: rgba(143,181,255,.04); font: inherit; letter-spacing: inherit; cursor: pointer; transition: 180ms ease; }
+.motion-visual-head button:hover { color: #071020; border-color: var(--mint); background: var(--mint); }
+.motion-canvas { position: absolute; inset: 52px 0 0; isolation: isolate; }
+.motion-canvas::before { content: ""; position: absolute; z-index: 0; inset: 8% 7%; pointer-events: none; background-image: linear-gradient(rgba(143,181,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(143,181,255,.045) 1px, transparent 1px); background-size: 46px 46px; mask-image: radial-gradient(circle, black 10%, transparent 68%); }
 .motion-canvas canvas { position: relative; z-index: 1; }
+.motion-scan-beam { position: absolute; z-index: 3; left: 7%; right: 7%; top: 12%; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(105,210,255,.28), var(--cyan), rgba(143,181,255,.25), transparent); box-shadow: 0 0 16px rgba(105,210,255,.32); animation: motion-scan 5.6s ease-in-out infinite; }
+.motion-ghost-key { position: absolute; z-index: 4; left: 22px; top: 22px; display: flex; align-items: center; gap: 8px; color: rgba(184,202,255,.62); font: .62rem "SFMono-Regular", Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.motion-ghost-key i { width: 22px; height: 8px; border-top: 1px dashed rgba(143,181,255,.7); }
 .angle-guide { position: absolute; z-index: 4; right: 28px; bottom: 28px; width: 104px; height: 104px; display: grid; place-items: center; color: var(--mint); border: 1px solid rgba(143,181,255,.22); border-radius: 50%; background: conic-gradient(from 180deg, var(--mint) var(--motion-angle), rgba(143,181,255,.09) 0 78deg, transparent 0); box-shadow: inset 0 0 0 8px #070914; font: 1rem "SFMono-Regular", Consolas, monospace; }
 .angle-guide::after { content: "FLEXION"; position: absolute; bottom: 20px; color: rgba(143,181,255,.58); font-size: .55rem; letter-spacing: .1em; }
 .motion-hover-label { position: absolute; z-index: 6; left: 22px; bottom: 24px; max-width: calc(100% - 170px); padding: 8px 11px; color: var(--mint); border: 1px solid rgba(143,181,255,.32); background: rgba(5,6,17,.76); backdrop-filter: blur(10px); font: .68rem "SFMono-Regular", Consolas, monospace; letter-spacing: .05em; }
@@ -202,6 +208,7 @@ footer a:hover { color: var(--mint); }
 @keyframes scroll-dot { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(8px); opacity: 1; } }
 @keyframes pulse-line { 0%, 100% { opacity: 0; transform: scaleX(.3); } 50% { opacity: 1; transform: scaleX(1); } }
 @keyframes live-pulse { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes motion-scan { 0%, 100% { top: 12%; opacity: 0; } 14% { opacity: .75; } 50% { opacity: 1; } 86% { opacity: .65; } 100% { top: 88%; opacity: 0; } }
 
 @media (max-width: 1000px) {
   .topbar { grid-template-columns: 1fr auto; }
@@ -261,4 +268,5 @@ footer a:hover { color: var(--mint); }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+  .motion-scan-beam { display: none; }
 }
