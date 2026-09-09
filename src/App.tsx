@@ -561,35 +561,90 @@ export default function App() {
           <div className="section-number">02</div>
           <div className="motion-copy" data-reveal>
             <p className="kicker">MOTION LAB</p>
-            <h2>One joint.<br />More than one motion.</h2>
+            <h2>Move it.<br />See it respond.</h2>
             <p>
               The knee is often described as a hinge, but flexion also includes subtle rolling, gliding and rotation.
-              Move the control to explore an educational approximation of knee flexion.
+              Adjust the live model while keeping its tissues, angle and viewing tools in sight.
             </p>
           </div>
-          <div className="motion-control" data-reveal>
-            <div className="angle-readout">
-              <span>{String(flexion).padStart(3, "0")}</span>
-              <sup>°</sup>
+
+          <div
+            className="motion-workbench"
+            data-reveal
+            style={{ "--motion-angle": `${Math.max(4, (flexion / 130) * 78)}deg` } as React.CSSProperties}
+          >
+            <div className="motion-visual">
+              <div className="motion-visual-head">
+                <span><i aria-hidden="true" /> LIVE MODEL</span>
+                <span>DRAG TO ROTATE</span>
+              </div>
+              <div className="motion-canvas" aria-label="Live knee flexion model">
+                <Scene
+                  selected={selected}
+                  xray={xray}
+                  exploded={exploded}
+                  flexion={flexion}
+                  onSelect={setSelected}
+                  onHover={setHovered}
+                />
+                <div className="angle-guide" aria-hidden="true">
+                  <span>{flexion}°</span>
+                </div>
+                {hovered && <div className="motion-hover-label">{hovered}</div>}
+              </div>
             </div>
-            <label htmlFor="flexion-range">Knee flexion</label>
-            <input
-              id="flexion-range"
-              type="range"
-              min="0"
-              max="130"
-              step="1"
-              value={flexion}
-              onChange={(event) => setFlexion(Number(event.target.value))}
-              style={{ "--progress": `${(flexion / 130) * 100}%` } as React.CSSProperties}
-            />
-            <div className="range-scale">
-              <span>EXTENDED</span>
-              <span>DEEP FLEXION</span>
+
+            <div className="motion-control">
+              <div className="angle-readout">
+                <span>{String(flexion).padStart(3, "0")}</span>
+                <sup>°</sup>
+              </div>
+              <label htmlFor="flexion-range">Knee flexion</label>
+              <input
+                id="flexion-range"
+                type="range"
+                min="0"
+                max="130"
+                step="1"
+                value={flexion}
+                onChange={(event) => setFlexion(Number(event.target.value))}
+                style={{ "--progress": `${(flexion / 130) * 100}%` } as React.CSSProperties}
+              />
+              <div className="range-scale">
+                <span>EXTENDED</span>
+                <span>DEEP FLEXION</span>
+              </div>
+
+              <div className="motion-control-group">
+                <p>Visible tissue</p>
+                <div className="motion-layer-options" role="group" aria-label="Choose tissue in live motion model">
+                  {structures.map((structure) => (
+                    <button
+                      key={structure.key}
+                      type="button"
+                      className={selected === structure.key ? "active" : ""}
+                      onClick={() => setSelected(structure.key)}
+                    >
+                      {structure.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="motion-tool-row" role="group" aria-label="Live model view tools">
+                <button type="button" className={xray ? "active" : ""} onClick={() => setXray((value) => !value)}>
+                  <Icon name="scan" /> X-ray
+                </button>
+                <button type="button" className={exploded ? "active" : ""} onClick={() => setExploded((value) => !value)}>
+                  <Icon name="layers" /> Explode
+                </button>
+              </div>
+
+              <p className="motion-state">
+                <span>{flexion < 15 ? "Near full extension" : flexion < 70 ? "Functional flexion" : "Deep flexion"}</span>
+                <span>{structureByKey[selected].label}</span>
+              </p>
             </div>
-            <p className="motion-state">
-              {flexion < 15 ? "Near full extension" : flexion < 70 ? "Functional flexion" : "Deep flexion"}
-            </p>
           </div>
         </section>
 
