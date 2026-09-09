@@ -10,6 +10,7 @@ gsap.registerPlugin(ScrollTrigger);
 type StructureKey = "all" | "bone" | "meniscus" | "cartilage" | "ligament" | "muscle";
 type AclState = "normal" | "strain" | "tear";
 type MuscleScope = "knee" | "regional";
+type MotionView = "side" | "quarter" | "front";
 
 type Structure = {
   key: StructureKey;
@@ -721,7 +722,7 @@ const labelsByStructure: Record<StructureKey, { label: string; position: [number
 function AnatomyLabels({ selected, muscleScope }: { selected: StructureKey; muscleScope: MuscleScope }) {
   const labels = selected === "muscle" && muscleScope === "regional"
     ? [
-        ...labelsByStructure.muscle,
+        { label: "GASTROCNEMIUS", position: [0.15, -0.61, -0.09] as [number, number, number] },
         { label: "SOLEUS", position: [0.15, -0.66, -0.105] as [number, number, number] },
         { label: "TIBIALIS ANTERIOR", position: [0.18, -0.62, 0.065] as [number, number, number] },
         { label: "FIBULARIS LONGUS", position: [0.215, -0.59, -0.01] as [number, number, number] },
@@ -730,8 +731,17 @@ function AnatomyLabels({ selected, muscleScope }: { selected: StructureKey; musc
   return (
     <group>
       {labels.map((item) => (
-        <Html key={item.label} position={item.position} center sprite distanceFactor={2.5} className="anatomy-label-wrap">
-          <span className="anatomy-label">{item.label}</span>
+        <Html
+          key={item.label}
+          position={item.position}
+          center
+          sprite
+          distanceFactor={3}
+          zIndexRange={[30, 10]}
+          className="anatomy-label-wrap"
+          style={{ pointerEvents: "none" }}
+        >
+          <span className="anatomy-label"><i aria-hidden="true" />{item.label}</span>
         </Html>
       ))}
     </group>
@@ -819,10 +829,10 @@ function KneeModel({
         object.userData.baseRotation = object.rotation.clone();
         if (!isLowerLegBone) return;
         object.material = new THREE.MeshBasicMaterial({
-          color: trailProgress === 0 ? "#9fbaff" : "#6ae0ff",
+          color: trailProgress === 0 ? "#dce7ff" : "#b9efff",
           wireframe: true,
           transparent: true,
-          opacity: 0.08,
+          opacity: 0.025,
           depthWrite: false,
         });
       });
@@ -842,22 +852,16 @@ function KneeModel({
     };
   }, [model, motionGhosts, surfaceTextures]);
 
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     if (!group.current) return;
     const ease = 1 - Math.pow(0.001, delta);
-    group.current.rotation.y = THREE.MathUtils.lerp(
-      group.current.rotation.y,
-      viewRotation + state.pointer.x * 0.08,
-      ease,
-    );
-    group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, -state.pointer.y * 0.06, ease);
 
     const bend = THREE.MathUtils.degToRad(flexion * -0.58);
     const pivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(bend, 0, 0)));
 
     motionGhosts.forEach((ghost) => {
       const trailProgress = ghost.userData.trailProgress as number;
-      ghost.visible = showMotionGhost && flexion > 4;
+      ghost.visible = showMotionGhost && flexion > 8;
       const trailBend = bend * trailProgress;
       const trailPivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(trailBend, 0, 0)));
       ghost.traverse((object) => {
@@ -866,7 +870,8 @@ function KneeModel({
         const baseRotation = object.userData.baseRotation as THREE.Euler;
         object.position.copy(basePosition).add(trailPivotShift);
         object.rotation.x = baseRotation.x + trailBend;
-        (object.material as THREE.MeshBasicMaterial).opacity = 0.04 + (1 - trailProgress) * 0.08 + (flexion / 130) * 0.04;
+        (object.material as THREE.MeshBasicMaterial).opacity =
+          0.012 + (1 - trailProgress) * 0.025 + (flexion / 130) * 0.015;
       });
     });
 
@@ -955,7 +960,7 @@ function KneeModel({
   );
 }
 
-function Scene(props: KneeModelProps) {
+function Scene({ stableView = false, ...props }: KneeModelProps & { stableView?: boolean }) {
   return (
     <Canvas
       camera={{ position: [0.2, 0.05, 3.9], fov: 30 }}
@@ -974,7 +979,11 @@ function Scene(props: KneeModelProps) {
           </Html>
         }
       >
-        <Float speed={0.85} rotationIntensity={0.06} floatIntensity={0.09}>
+        <Float
+          speed={stableView ? 0 : 0.85}
+          rotationIntensity={stableView ? 0 : 0.025}
+          floatIntensity={stableView ? 0 : 0.06}
+        >
           <Bounds fit clip observe margin={1.22}>
             <KneeModel {...props} />
           </Bounds>
@@ -986,9 +995,18 @@ function Scene(props: KneeModelProps) {
         enableZoom
         minDistance={2.4}
         maxDistance={6}
-        dampingFactor={0.055}
+        enableDamping
+        dampingFactor={0.09}
+        rotateSpeed={0.48}
+        zoomSpeed={0.7}
         minPolarAngle={Math.PI * 0.25}
         maxPolarAngle={Math.PI * 0.75}
+        minAzimuthAngle={-Math.PI * 0.72}
+        maxAzimuthAngle={Math.PI * 0.72}
+        mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
+        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
+        onStart={() => document.body.classList.add("is-orbiting")}
+        onEnd={() => document.body.classList.remove("is-orbiting")}
       />
     </Canvas>
   );
@@ -1025,6 +1043,7 @@ export default function App() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [quizAnswer, setQuizAnswer] = useState<boolean | null>(null);
   const [motionViewKey, setMotionViewKey] = useState(0);
+  const [motionView, setMotionView] = useState<MotionView>("side");
   const [showLabels, setShowLabels] = useState(true);
   const [tensionMap, setTensionMap] = useState(false);
   const [aclState, setAclState] = useState<AclState>("normal");
@@ -1065,6 +1084,17 @@ export default function App() {
     const rect = event.currentTarget.getBoundingClientRect();
     event.currentTarget.style.setProperty("--scan-x", `${event.clientX - rect.left}px`);
     event.currentTarget.style.setProperty("--scan-y", `${event.clientY - rect.top}px`);
+  };
+
+  const setMotionViewPreset = (view: MotionView) => {
+    setMotionView(view);
+    setMotionViewKey((value) => value + 1);
+  };
+
+  const motionViewRotation: Record<MotionView, number> = {
+    side: -Math.PI / 2,
+    quarter: -Math.PI / 4,
+    front: 0,
   };
 
   return (
@@ -1189,9 +1219,19 @@ export default function App() {
             <div className="motion-visual">
               <div className="motion-visual-head">
                 <span><i aria-hidden="true" /> LIVE MODEL</span>
-                <button type="button" onClick={() => setMotionViewKey((value) => value + 1)}>
-                  RESET SIDE VIEW
-                </button>
+                <div className="view-presets" role="group" aria-label="Model view">
+                  {(["side", "quarter", "front"] as MotionView[]).map((view) => (
+                    <button
+                      key={view}
+                      type="button"
+                      className={motionView === view ? "active" : ""}
+                      aria-pressed={motionView === view}
+                      onClick={() => setMotionViewPreset(view)}
+                    >
+                      {view === "quarter" ? "3/4" : view}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="motion-canvas" aria-label="Live knee flexion model">
                 <Scene
@@ -1203,14 +1243,16 @@ export default function App() {
                   muscleScope={muscleScope}
                   onSelect={setSelected}
                   onHover={setHovered}
-                  viewRotation={-Math.PI / 2}
+                  viewRotation={motionViewRotation[motionView]}
+                  stableView
                   showMotionGhost
                   showLabels={showLabels}
                   tensionMap={tensionMap}
                   aclState={aclState}
                 />
                 <div className="motion-scan-beam" aria-hidden="true" />
-                {flexion > 4 && <div className="motion-ghost-key" aria-hidden="true"><i /> Motion trail · extension reference</div>}
+                {flexion > 8 && <div className="motion-ghost-key" aria-hidden="true"><i /> Light motion trail · extension reference</div>}
+                <div className="orbit-hint" aria-hidden="true">DRAG · ROTATE&nbsp;&nbsp; / &nbsp;&nbsp;WHEEL · ZOOM</div>
                 <div className="angle-guide" aria-hidden="true">
                   <span>{flexion}°</span>
                 </div>
