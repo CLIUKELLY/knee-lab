@@ -249,9 +249,20 @@ type KneeModelProps = {
   flexion: number;
   onSelect: (key: StructureKey) => void;
   onHover: (label: string | null) => void;
+  viewRotation?: number;
+  showMotionGhost?: boolean;
 };
 
-function KneeModel({ selected, xray, exploded, flexion, onSelect, onHover }: KneeModelProps) {
+function KneeModel({
+  selected,
+  xray,
+  exploded,
+  flexion,
+  onSelect,
+  onHover,
+  viewRotation = -0.2,
+  showMotionGhost = false,
+}: KneeModelProps) {
   const group = useRef<THREE.Group>(null);
   const { scene } = useGLTF(`${import.meta.env.BASE_URL}models/knee.glb`);
 
@@ -287,22 +298,58 @@ function KneeModel({ selected, xray, exploded, flexion, onSelect, onHover }: Kne
     return cloned;
   }, [scene]);
 
+  const extensionGhost = useMemo(() => {
+    const cloned = scene.clone(true);
+    cloned.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const isLowerLegBone = /tibia|fibula/i.test(object.name) && !isAnnotation(object.name);
+      object.visible = isLowerLegBone;
+      object.raycast = () => undefined;
+      if (!isLowerLegBone) return;
+      object.material = new THREE.MeshBasicMaterial({
+        color: "#8fb5ff",
+        wireframe: true,
+        transparent: true,
+        opacity: 0.12,
+        depthWrite: false,
+      });
+    });
+    return cloned;
+  }, [scene]);
+
   useEffect(() => {
     return () => {
       model.traverse((object) => {
         if (object instanceof THREE.Mesh) object.material.dispose();
       });
+      extensionGhost.traverse((object) => {
+        if (object instanceof THREE.Mesh && object.visible) object.material.dispose();
+      });
     };
-  }, [model]);
+  }, [extensionGhost, model]);
 
   useFrame((state, delta) => {
     if (!group.current) return;
     const ease = 1 - Math.pow(0.001, delta);
-    group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, state.pointer.x * 0.12 - 0.2, ease);
+    group.current.rotation.y = THREE.MathUtils.lerp(
+      group.current.rotation.y,
+      viewRotation + state.pointer.x * 0.08,
+      ease,
+    );
     group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, -state.pointer.y * 0.06, ease);
 
     const bend = THREE.MathUtils.degToRad(flexion * -0.58);
-      const pivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(bend, 0, 0)));
+    const pivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(bend, 0, 0)));
+
+    extensionGhost.visible = showMotionGhost && flexion > 4;
+    extensionGhost.traverse((object) => {
+      if (!(object instanceof THREE.Mesh) || !object.visible) return;
+      (object.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.lerp(
+        (object.material as THREE.MeshBasicMaterial).opacity,
+        0.055 + (flexion / 130) * 0.12,
+        ease,
+      );
+    });
 
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh) || !object.visible) return;
@@ -344,9 +391,10 @@ function KneeModel({ selected, xray, exploded, flexion, onSelect, onHover }: Kne
   };
 
   return (
-    <group ref={group}>
+    <group ref={group} rotation={[0, viewRotation, 0]}>
       <Center>
         <group scale={4.35}>
+          {showMotionGhost && <primitive object={extensionGhost} />}
           <primitive
             object={model}
             onPointerOver={(event: ThreeEvent<PointerEvent>) => {
@@ -443,6 +491,7 @@ export default function App() {
   const [flexion, setFlexion] = useState(0);
   const [hovered, setHovered] = useState<string | null>(null);
   const [quizAnswer, setQuizAnswer] = useState<boolean | null>(null);
+  const [motionViewKey, setMotionViewKey] = useState(0);
   const active = structureByKey[selected];
 
   useLayoutEffect(() => {
@@ -576,17 +625,24 @@ export default function App() {
             <div className="motion-visual">
               <div className="motion-visual-head">
                 <span><i aria-hidden="true" /> LIVE MODEL</span>
-                <span>DRAG TO ROTATE</span>
+                <button type="button" onClick={() => setMotionViewKey((value) => value + 1)}>
+                  RESET SIDE VIEW
+                </button>
               </div>
               <div className="motion-canvas" aria-label="Live knee flexion model">
                 <Scene
+                  key={motionViewKey}
                   selected={selected}
                   xray={xray}
                   exploded={exploded}
                   flexion={flexion}
                   onSelect={setSelected}
                   onHover={setHovered}
+                  viewRotation={-Math.PI / 2}
+                  showMotionGhost
                 />
+                <div className="motion-scan-beam" aria-hidden="true" />
+                {flexion > 4 && <div className="motion-ghost-key" aria-hidden="true"><i /> Extension reference</div>}
                 <div className="angle-guide" aria-hidden="true">
                   <span>{flexion}°</span>
                 </div>
