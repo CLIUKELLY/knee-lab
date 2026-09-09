@@ -105,6 +105,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .orbit-two { inset: 25% 20%; transform: rotate(23deg); border-color: rgba(156, 140, 255, 0.12); }
 .hover-label { position: absolute; z-index: 6; top: 13%; left: 50%; transform: translateX(-50%); padding: 7px 11px; border: 1px solid rgba(143,181,255,.4); border-radius: 99px; color: var(--mint); background: rgba(5,6,17,.8); backdrop-filter: blur(12px); font: 0.68rem "SFMono-Regular", Consolas, monospace; letter-spacing: .08em; }
 .model-loading { width: 150px; color: var(--mint); font: 0.68rem "SFMono-Regular", Consolas, monospace; letter-spacing: .12em; text-align: center; }
+.anatomy-label-wrap { pointer-events: none !important; }
+.anatomy-label { position: relative; display: block; min-width: max-content; padding: 5px 8px; color: #dce7ff; border: 1px solid rgba(143,181,255,.48); border-radius: 2px; background: rgba(5,6,17,.82); box-shadow: 0 0 22px rgba(105,210,255,.13); backdrop-filter: blur(9px); font: .46rem "SFMono-Regular", Consolas, monospace; letter-spacing: .12em; white-space: nowrap; }
+.anatomy-label::before { content: ""; position: absolute; right: 100%; top: 50%; width: 22px; height: 1px; background: linear-gradient(90deg, transparent, rgba(143,181,255,.72)); }
+.anatomy-label::after { content: ""; position: absolute; right: calc(100% + 21px); top: calc(50% - 2px); width: 4px; height: 4px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
 
 .structure-panel { position: relative; z-index: 4; max-width: 285px; padding-left: 26px; border-left: 1px solid var(--line); }
 .structure-panel > p:first-child { color: var(--mint); font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.64rem; letter-spacing: 0.13em; }
@@ -170,14 +174,39 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .motion-tool-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 16px; }
 .motion-tool-row button { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .motion-tool-row svg { width: 15px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.motion-tool-row button.tension-active { border-color: #ff5575; background: #e93f64; box-shadow: 0 8px 24px rgba(233,63,100,.2); }
+.injury-lab { margin-top: 24px; padding-top: 22px; border-top: 1px solid rgba(25,38,72,.13); }
+.injury-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.injury-head p { margin: 0; color: #5d667d; font: .72rem "SFMono-Regular", Consolas, monospace; letter-spacing: .1em; }
+.injury-head span { padding: 4px 6px; color: #9b4a5c; border: 1px solid rgba(195,68,94,.24); font: .52rem "SFMono-Regular", Consolas, monospace; letter-spacing: .1em; }
+.injury-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.injury-options button { padding: 10px 7px; color: #646e86; border: 1px solid rgba(25,38,72,.15); background: transparent; text-transform: uppercase; cursor: pointer; font: .64rem "SFMono-Regular", Consolas, monospace; letter-spacing: .08em; transition: 180ms ease; }
+.injury-options button:hover, .injury-options button.active { color: #fff; background: #375fd2; border-color: #375fd2; }
+.injury-options button.active.is-strain { background: #ec7759; border-color: #ec7759; }
+.injury-options button.active.is-tear { background: #e93f64; border-color: #e93f64; box-shadow: 0 8px 22px rgba(233,63,100,.2); }
+.injury-note { min-height: 34px; margin: 11px 0 0; color: #747d93; font-size: .71rem; line-height: 1.55; }
+.tension-legend { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; margin-top: 18px; }
+.tension-legend > span { color: #747d93; font: .55rem "SFMono-Regular", Consolas, monospace; letter-spacing: .08em; }
+.tension-legend > i { height: 5px; border-radius: 9px; background: linear-gradient(90deg, #f0cf86, #ff9a62, #ff315f); box-shadow: 0 0 12px rgba(255,76,106,.2); }
+.tension-legend p { grid-column: 1 / -1; margin: 0; color: #858da0; font-size: .66rem; line-height: 1.5; }
 .motion-state { display: flex; justify-content: space-between; gap: 16px; margin: 28px 0 0; padding-top: 18px; color: #375fd2; border-top: 1px solid rgba(25,38,72,.13); font-size: .82rem; }
 .motion-state span:last-child { color: #6d768d; }
 
 .learn-section { padding: 10vw 6vw 11vw; background: #070815; }
 .learn-heading { max-width: 1000px; margin-bottom: 7vw; }
 .learn-heading h2 { color: #eef1ff; }
-.anatomy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
-.anatomy-grid article { min-height: 440px; padding: 28px; display: flex; flex-direction: column; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.layer-explorer { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr); gap: 4vw; align-items: start; }
+.layer-sticky { position: sticky; top: 7vh; height: 86vh; }
+.layer-scene { position: relative; height: 100%; overflow: hidden; border: 1px solid var(--line); background: radial-gradient(circle at 50% 42%, rgba(80,112,255,.17), transparent 37%), radial-gradient(circle at 62% 60%, rgba(105,210,255,.08), transparent 28%), #050611; }
+.layer-scene::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background-image: linear-gradient(rgba(143,181,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(143,181,255,.035) 1px, transparent 1px); background-size: 50px 50px; mask-image: radial-gradient(circle, black 5%, transparent 72%); }
+.layer-scene canvas { position: relative; z-index: 2; }
+.layer-hud { position: absolute; z-index: 4; left: 22px; right: 22px; top: 20px; display: flex; justify-content: space-between; color: rgba(185,198,235,.55); font: .62rem "SFMono-Regular", Consolas, monospace; letter-spacing: .1em; }
+.layer-hud strong { color: var(--mint); font-size: .8rem; font-weight: 400; }
+.layer-progress { position: absolute; z-index: 4; right: 20px; top: 58px; bottom: 24px; width: 2px; background: rgba(143,181,255,.12); }
+.layer-progress i { position: absolute; inset: 0 0 auto; background: linear-gradient(var(--mint), var(--cyan)); box-shadow: 0 0 12px var(--cyan); transition: height 80ms linear; }
+.anatomy-grid { display: grid; grid-template-columns: 1fr; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.anatomy-grid article { min-height: 72vh; padding: clamp(28px, 3vw, 46px); display: flex; flex-direction: column; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); opacity: .4; transition: opacity 240ms ease, background 240ms ease, border-color 240ms ease; }
+.anatomy-grid article.is-current { opacity: 1; border-color: rgba(143,181,255,.4); background: linear-gradient(145deg, rgba(143,181,255,.07), transparent 50%); }
 .material-swatch { position: relative; height: 150px; margin-bottom: 42px; overflow: hidden; background: radial-gradient(circle at 50% 130%, currentColor, transparent 70%); }
 .material-swatch::after { content: ""; position: absolute; width: 80px; height: 80px; top: 34px; left: calc(50% - 40px); border: 1px solid currentColor; border-radius: 50%; box-shadow: 0 0 42px currentColor, inset 0 0 28px currentColor; opacity: .55; }
 .material-swatch span { position: absolute; z-index: 1; top: 12px; left: 12px; color: #7e869e; font: .62rem "SFMono-Regular", Consolas, monospace; }
@@ -224,7 +253,8 @@ footer a:hover { color: var(--mint); }
   .motion-workbench { grid-template-columns: 1fr; }
   .motion-visual { min-height: 580px; }
   .motion-control { border-top: 1px solid rgba(25,38,72,.16); border-left: 0; }
-  .anatomy-grid { grid-template-columns: 1fr; }
+  .layer-explorer { grid-template-columns: 1fr; }
+  .layer-sticky { top: 0; z-index: 3; height: 62vh; min-height: 480px; }
   .anatomy-grid article { min-height: 380px; }
 }
 
@@ -256,6 +286,8 @@ footer a:hover { color: var(--mint); }
   .motion-hover-label { left: 16px; bottom: 18px; }
   .learn-section { padding: 100px 20px; }
   .learn-heading { margin-bottom: 64px; }
+  .layer-explorer { gap: 0; }
+  .layer-sticky { height: 55vh; min-height: 390px; }
   .anatomy-grid article { min-height: 400px; }
   .quiz-section { padding: 0 20px 100px; }
   .quiz-card { padding: 34px 22px; }
