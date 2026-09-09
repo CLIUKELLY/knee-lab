@@ -59,7 +59,7 @@ const structures: Structure[] = [
     label: "Muscles",
     eyebrow: "06 / POWER",
     description: "Quadriceps extend the knee, while the hamstrings flex it and the gastrocnemius can assist flexion.",
-    fact: "These simplified muscle volumes show relationships, not individual diagnostic anatomy.",
+    fact: "The reconstruction separates four quadriceps components, posterior hamstrings and both gastrocnemius heads.",
   },
 ];
 
@@ -328,35 +328,181 @@ function SoftStrand({
   );
 }
 
-type MuscleProps = {
+type MusclePath = {
   name: string;
-  position: [number, number, number];
-  scale: [number, number, number];
-  rotation?: [number, number, number];
-  lower?: boolean;
-} & Pick<KneeModelProps, "selected" | "xray" | "exploded" | "explodeAmount" | "flexion" | "onSelect" | "onHover">;
+  points: [number, number, number][];
+  radius: number;
+  depth: number;
+  color: string;
+  pennation: number;
+  lowerMode?: "distal" | "all";
+};
 
-function MuscleVolume({ name, position, scale, rotation = [0, 0, 0], lower, selected, xray, exploded, explodeAmount, flexion, onSelect, onHover }: MuscleProps) {
+const musclePaths: MusclePath[] = [
+  {
+    name: "Rectus femoris",
+    points: [[0.145, -0.015, 0.048], [0.146, -0.12, 0.056], [0.148, -0.235, 0.054], [0.151, -0.325, 0.048]],
+    radius: 0.026,
+    depth: 0.72,
+    color: "#cf6e69",
+    pennation: 0.08,
+  },
+  {
+    name: "Vastus medialis",
+    points: [[0.112, -0.035, 0.018], [0.103, -0.15, 0.028], [0.107, -0.265, 0.038], [0.139, -0.348, 0.048]],
+    radius: 0.03,
+    depth: 0.74,
+    color: "#d87d73",
+    pennation: 0.42,
+  },
+  {
+    name: "Vastus lateralis",
+    points: [[0.18, -0.025, 0.012], [0.191, -0.14, 0.022], [0.188, -0.26, 0.034], [0.16, -0.35, 0.047]],
+    radius: 0.033,
+    depth: 0.78,
+    color: "#c76565",
+    pennation: -0.34,
+  },
+  {
+    name: "Vastus intermedius",
+    points: [[0.146, -0.045, 0.004], [0.146, -0.16, 0.008], [0.148, -0.27, 0.018], [0.151, -0.345, 0.038]],
+    radius: 0.024,
+    depth: 0.62,
+    color: "#ad5559",
+    pennation: 0.16,
+  },
+  {
+    name: "Biceps femoris",
+    points: [[0.185, -0.025, -0.052], [0.194, -0.15, -0.062], [0.198, -0.31, -0.055], [0.206, -0.47, -0.034]],
+    radius: 0.027,
+    depth: 0.72,
+    color: "#b85b60",
+    pennation: -0.24,
+    lowerMode: "distal",
+  },
+  {
+    name: "Semitendinosus + semimembranosus",
+    points: [[0.112, -0.03, -0.06], [0.102, -0.16, -0.072], [0.099, -0.31, -0.06], [0.104, -0.5, -0.018]],
+    radius: 0.025,
+    depth: 0.7,
+    color: "#ad565e",
+    pennation: 0.2,
+    lowerMode: "distal",
+  },
+  {
+    name: "Medial gastrocnemius",
+    points: [[0.116, -0.405, -0.052], [0.108, -0.49, -0.078], [0.112, -0.61, -0.08], [0.125, -0.72, -0.058]],
+    radius: 0.031,
+    depth: 0.76,
+    color: "#c96b65",
+    pennation: 0.3,
+    lowerMode: "all",
+  },
+  {
+    name: "Lateral gastrocnemius",
+    points: [[0.178, -0.405, -0.052], [0.184, -0.49, -0.075], [0.18, -0.605, -0.078], [0.167, -0.715, -0.057]],
+    radius: 0.029,
+    depth: 0.74,
+    color: "#bd615f",
+    pennation: -0.28,
+    lowerMode: "all",
+  },
+];
+
+function muscleRadiusAt(t: number, radius: number) {
+  const belly = Math.pow(Math.max(0, Math.sin(Math.PI * t)), 0.58);
+  const asymmetry = 0.92 + 0.08 * Math.sin((t - 0.18) * Math.PI);
+  return radius * (0.09 + belly * 0.91) * asymmetry;
+}
+
+function createMuscleSurface(curve: THREE.CatmullRomCurve3, radius: number, depth: number) {
+  const segments = 34;
+  const radialSegments = 16;
+  const frames = curve.computeFrenetFrames(segments, false);
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  for (let i = 0; i <= segments; i += 1) {
+    const t = i / segments;
+    const center = curve.getPointAt(t);
+    const width = muscleRadiusAt(t, radius);
+    for (let j = 0; j <= radialSegments; j += 1) {
+      const angle = (j / radialSegments) * Math.PI * 2;
+      const point = center
+        .clone()
+        .add(frames.normals[i].clone().multiplyScalar(Math.cos(angle) * width))
+        .add(frames.binormals[i].clone().multiplyScalar(Math.sin(angle) * width * depth));
+      positions.push(point.x, point.y, point.z);
+      uvs.push(j / radialSegments, t);
+    }
+  }
+
+  for (let i = 0; i < segments; i += 1) {
+    for (let j = 0; j < radialSegments; j += 1) {
+      const a = i * (radialSegments + 1) + j;
+      const b = (i + 1) * (radialSegments + 1) + j;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return { geometry, frames, segments };
+}
+
+function MuscleBundle({ muscle, selected, xray, exploded, explodeAmount, flexion, onSelect, onHover }: { muscle: MusclePath } & Pick<KneeModelProps, "selected" | "xray" | "exploded" | "explodeAmount" | "flexion" | "onSelect" | "onHover">) {
   const active = selected === "all" || selected === "muscle";
-  const base = useMemo(() => new THREE.Vector3(...position), [position]);
-  const moved = lower ? rotateLowerPoint(base, flexion) : base;
-  const bend = lower ? THREE.MathUtils.degToRad(flexion * -0.58) : 0;
   const explosion = explodeAmount ?? (exploded ? 1 : 0);
-  const displayPosition = moved.clone().add(new THREE.Vector3(0, 0, -0.035 * explosion));
   const muscleTexture = useMemo(() => createTissueTexture("muscle"), []);
+  const generated = useMemo(() => {
+    const points = muscle.points.map((point, index) => {
+      const vector = new THREE.Vector3(...point);
+      const shouldRotate = muscle.lowerMode === "all" || (muscle.lowerMode === "distal" && index === muscle.points.length - 1);
+      const moved = shouldRotate ? rotateLowerPoint(vector, flexion) : vector;
+      return moved.add(new THREE.Vector3(0, 0, -0.035 * explosion));
+    });
+    const curve = new THREE.CatmullRomCurve3(points);
+    const surface = createMuscleSurface(curve, muscle.radius, muscle.depth);
+    const fibres = Array.from({ length: 7 }, (_, fibreIndex) => {
+      const baseAngle = (fibreIndex / 7) * Math.PI * 2;
+      const fibrePoints = Array.from({ length: 20 }, (_, pointIndex) => {
+        const t = 0.035 + (pointIndex / 19) * 0.93;
+        const frameIndex = Math.min(surface.segments, Math.round(t * surface.segments));
+        const phase = baseAngle + muscle.pennation * (t - 0.5);
+        const width = muscleRadiusAt(t, muscle.radius) * 1.012;
+        return curve
+          .getPointAt(t)
+          .add(surface.frames.normals[frameIndex].clone().multiplyScalar(Math.cos(phase) * width))
+          .add(surface.frames.binormals[frameIndex].clone().multiplyScalar(Math.sin(phase) * width * muscle.depth));
+      });
+      return new THREE.TubeGeometry(
+        new THREE.CatmullRomCurve3(fibrePoints),
+        22,
+        Math.max(0.0003, muscle.radius * 0.018),
+        4,
+        false,
+      );
+    });
+    return { body: surface.geometry, fibres };
+  }, [explosion, flexion, muscle]);
+
+  useEffect(() => () => {
+    generated.body.dispose();
+    generated.fibres.forEach((geometry) => geometry.dispose());
+  }, [generated]);
   useEffect(() => () => muscleTexture.dispose(), [muscleTexture]);
 
   return (
-    <mesh
-      name={name}
-      position={displayPosition}
-      scale={scale}
-      rotation={[rotation[0] + bend, rotation[1], rotation[2]]}
-      castShadow
+    <group
+      name={muscle.name}
       onPointerOver={(event) => {
         event.stopPropagation();
         document.body.style.cursor = "pointer";
-        onHover(name);
+        onHover(muscle.name);
       }}
       onPointerOut={() => {
         document.body.style.cursor = "default";
@@ -367,24 +513,38 @@ function MuscleVolume({ name, position, scale, rotation = [0, 0, 0], lower, sele
         onSelect("muscle");
       }}
     >
-      <sphereGeometry args={[1, 28, 18]} />
-      <meshPhysicalMaterial
-        color={palette.muscle}
-        map={muscleTexture}
-        bumpMap={muscleTexture}
-        bumpScale={0.035}
-        roughness={0.6}
-        clearcoat={0.08}
-        sheen={0.65}
-        sheenColor="#ffc0b4"
-        sheenRoughness={0.7}
-        transparent
-        opacity={!active ? 0.04 : xray ? 0.2 : 0.74}
-        depthWrite={active && !xray}
-        emissive={active && selected === "muscle" ? palette.muscle : "#000000"}
-        emissiveIntensity={active && selected === "muscle" ? 0.12 : 0}
-      />
-    </mesh>
+      <mesh geometry={generated.body} castShadow receiveShadow>
+        <meshPhysicalMaterial
+          color={muscle.color}
+          map={muscleTexture}
+          bumpMap={muscleTexture}
+          bumpScale={0.0014}
+          roughness={0.68}
+          clearcoat={0.035}
+          sheen={0.38}
+          sheenColor="#ffb6a9"
+          sheenRoughness={0.82}
+          transparent
+          opacity={!active ? 0.035 : xray ? 0.16 : 0.86}
+          depthWrite={active && !xray}
+          emissive={active && selected === "muscle" ? muscle.color : "#000000"}
+          emissiveIntensity={active && selected === "muscle" ? 0.055 : 0}
+        />
+      </mesh>
+      {generated.fibres.map((geometry, index) => (
+        <mesh key={index} geometry={geometry}>
+          <meshPhysicalMaterial
+            color="#f2a091"
+            roughness={0.74}
+            sheen={0.5}
+            sheenColor="#ffd3c8"
+            transparent
+            opacity={!active ? 0 : xray ? 0.14 : 0.42}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+    </group>
   );
 }
 
@@ -402,9 +562,7 @@ function SoftTissues(props: KneeModelProps) {
   return (
     <group>
       {strands.map((strand) => <SoftStrand key={strand.name} {...props} {...strand} />)}
-      <MuscleVolume {...props} name="Quadriceps" position={[0.133, -0.17, 0.026]} scale={[0.046, 0.15, 0.035]} rotation={[0.04, 0, -0.04]} />
-      <MuscleVolume {...props} name="Hamstrings" position={[0.126, -0.2, -0.057]} scale={[0.036, 0.15, 0.03]} rotation={[-0.05, 0, 0.08]} />
-      <MuscleVolume {...props} name="Gastrocnemius" position={[0.146, -0.61, -0.068]} scale={[0.05, 0.15, 0.038]} rotation={[0.06, 0, -0.03]} lower />
+      {musclePaths.map((muscle) => <MuscleBundle key={muscle.name} {...props} muscle={muscle} />)}
     </group>
   );
 }
@@ -452,9 +610,11 @@ const labelsByStructure: Record<StructureKey, { label: string; position: [number
     { label: "LCL", position: [0.195, -0.43, -0.03] },
   ],
   muscle: [
-    { label: "QUADRICEPS", position: [0.13, -0.18, 0.04] },
-    { label: "HAMSTRINGS", position: [0.12, -0.22, -0.07] },
-    { label: "GASTROCNEMIUS", position: [0.15, -0.62, -0.07] },
+    { label: "RECTUS FEMORIS", position: [0.145, -0.17, 0.07] },
+    { label: "VASTUS MEDIALIS", position: [0.105, -0.25, 0.045] },
+    { label: "VASTUS LATERALIS", position: [0.19, -0.2, 0.035] },
+    { label: "HAMSTRINGS", position: [0.105, -0.25, -0.085] },
+    { label: "GASTROCNEMIUS", position: [0.15, -0.61, -0.09] },
   ],
 };
 
