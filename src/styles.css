@@ -116,6 +116,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .panel-rule { width: 34px; height: 1px; margin-bottom: 20px; background: var(--mint); }
 .panel-description, .panel-fact { color: #9da4b9; font-size: 0.84rem; line-height: 1.7; }
 .panel-fact { color: #737b91; }
+.origin-disclaimer { margin-top: 22px; padding: 13px 0 0; border-top: 1px solid var(--line); }
+.origin-disclaimer span { color: var(--mint); font: .58rem "SFMono-Regular", Consolas, monospace; letter-spacing: .1em; }
+.origin-disclaimer p { margin: 8px 0 0; color: #737b91; font-size: .72rem; line-height: 1.55; }
 
 .structure-tabs { position: relative; z-index: 5; grid-column: 1 / 3; display: flex; align-self: end; border-top: 1px solid var(--line); }
 .structure-tabs button { min-width: 145px; padding: 19px 24px; color: #848ca3; border: 0; border-right: 1px solid var(--line); background: transparent; cursor: pointer; text-align: left; transition: color 180ms ease, background 180ms ease; }
@@ -189,6 +192,11 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .tension-legend > span { color: #747d93; font: .55rem "SFMono-Regular", Consolas, monospace; letter-spacing: .08em; }
 .tension-legend > i { height: 5px; border-radius: 9px; background: linear-gradient(90deg, #f0cf86, #ff9a62, #ff315f); box-shadow: 0 0 12px rgba(255,76,106,.2); }
 .tension-legend p { grid-column: 1 / -1; margin: 0; color: #858da0; font-size: .66rem; line-height: 1.5; }
+.muscle-scope-control { margin-top: 24px; padding-top: 22px; border-top: 1px solid rgba(25,38,72,.13); }
+.scope-options { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.scope-options button { min-height: 40px; padding: 9px; color: #646e86; border: 1px solid rgba(25,38,72,.15); background: transparent; cursor: pointer; font: .64rem "SFMono-Regular", Consolas, monospace; letter-spacing: .04em; transition: 180ms ease; }
+.scope-options button:hover, .scope-options button.active { color: #fff; border-color: #375fd2; background: #375fd2; box-shadow: 0 8px 22px rgba(55,95,210,.16); }
+.muscle-scope-control > p { margin: 11px 0 0; color: #747d93; font-size: .69rem; line-height: 1.55; }
 .motion-state { display: flex; justify-content: space-between; gap: 16px; margin: 28px 0 0; padding-top: 18px; color: #375fd2; border-top: 1px solid rgba(25,38,72,.13); font-size: .82rem; }
 .motion-state span:last-child { color: #6d768d; }
 
