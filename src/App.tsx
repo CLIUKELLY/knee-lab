@@ -70,9 +70,9 @@ const structureByKey = Object.fromEntries(structures.map((item) => [item.key, it
 type TissueKey = Exclude<StructureKey, "all">;
 
 const palette: Record<TissueKey, string> = {
-  bone: "#ece4d6",
-  meniscus: "#8df0c5",
-  cartilage: "#61d9ed",
+  bone: "#eeeaf2",
+  meniscus: "#a9b7ff",
+  cartilage: "#69d2ff",
   ligament: "#f0cf86",
   muscle: "#db7f78",
 };
@@ -382,10 +382,10 @@ function Scene(props: KneeModelProps) {
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
     >
       <ambientLight intensity={1.25} />
-      <directionalLight position={[3, 4, 5]} intensity={4.2} color="#fff3df" />
-      <directionalLight position={[-4, 1, -3]} intensity={2.5} color="#61d9ed" />
-      <pointLight position={[0, -2, 2]} intensity={1.8} color="#8df0c5" />
-      <Sparkles count={75} scale={[3.2, 4.4, 2]} size={1.35} speed={0.18} opacity={0.35} color="#8df0c5" />
+      <directionalLight position={[3, 4, 5]} intensity={4.2} color="#f4f6ff" />
+      <directionalLight position={[-4, 1, -3]} intensity={2.5} color="#69d2ff" />
+      <pointLight position={[0, -2, 2]} intensity={1.8} color="#9c8cff" />
+      <Sparkles count={75} scale={[3.2, 4.4, 2]} size={1.35} speed={0.18} opacity={0.35} color="#8fb5ff" />
       <Suspense
         fallback={
           <Html center>
