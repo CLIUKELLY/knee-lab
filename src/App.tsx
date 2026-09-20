@@ -4,71 +4,23 @@ import { Canvas, ThreeEvent, useFrame } from "@react-three/fiber";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import * as THREE from "three";
+import {
+  anatomyEntities,
+  entityById,
+  entityIdForModelName,
+  movementPresets,
+  structureByKey,
+  structures,
+  type AclState,
+  type MotionView,
+  type MuscleScope,
+  type MovementPreset,
+  type StructureKey,
+} from "./anatomy/data";
+import { usePerformanceMode } from "./hooks/usePerformanceMode";
+import { useVisibleCanvas } from "./hooks/useVisibleCanvas";
 
 gsap.registerPlugin(ScrollTrigger);
-
-type StructureKey = "all" | "bone" | "meniscus" | "cartilage" | "ligament" | "muscle";
-type AclState = "normal" | "strain" | "tear";
-type MuscleScope = "knee" | "regional";
-type MotionView = "side" | "quarter" | "front";
-
-type Structure = {
-  key: StructureKey;
-  label: string;
-  eyebrow: string;
-  description: string;
-  fact: string;
-};
-
-const structures: Structure[] = [
-  {
-    key: "all",
-    label: "Whole joint",
-    eyebrow: "01 / SYSTEM",
-    description: "The knee coordinates bone, cartilage, menisci, ligaments, tendons and muscle to carry load while remaining mobile.",
-    fact: "It behaves like a modified hinge, combining flexion with small rotations and gliding movements.",
-  },
-  {
-    key: "bone",
-    label: "Bones",
-    eyebrow: "02 / FRAME",
-    description: "The femur meets the tibia while the patella protects the front of the joint and improves leverage.",
-    fact: "Four bones appear here: femur, tibia, fibula and patella.",
-  },
-  {
-    key: "meniscus",
-    label: "Menisci",
-    eyebrow: "03 / CUSHION",
-    description: "Two crescent-shaped pads help spread load across the top of the tibia.",
-    fact: "Their wedge-like geometry also contributes to joint stability.",
-  },
-  {
-    key: "cartilage",
-    label: "Cartilage",
-    eyebrow: "04 / GLIDE",
-    description: "Smooth articular cartilage covers contact surfaces so the bones can move with very little friction.",
-    fact: "Unlike most tissues, articular cartilage has no direct blood supply.",
-  },
-  {
-    key: "ligament",
-    label: "Ligaments",
-    eyebrow: "05 / CONTROL",
-    description: "The cruciate and collateral ligaments guide motion and resist excessive translation and rotation.",
-    fact: "ACL and PCL cross inside the joint; MCL and LCL reinforce its sides. Tendons are shown with this layer.",
-  },
-  {
-    key: "muscle",
-    label: "Muscles",
-    eyebrow: "06 / POWER",
-    description: "Quadriceps extend the knee, while the hamstrings flex it and the gastrocnemius can assist flexion.",
-    fact: "The reconstruction separates four quadriceps components, posterior hamstrings and both gastrocnemius heads.",
-  },
-];
-
-const structureByKey = Object.fromEntries(structures.map((item) => [item.key, item])) as Record<
-  StructureKey,
-  Structure
->;
 
 type TissueKey = Exclude<StructureKey, "all">;
 
@@ -165,6 +117,7 @@ type StrandProps = {
   radius?: number;
   category?: "ligament";
   selected: StructureKey;
+  selectedEntity: string | null;
   xray: boolean;
   exploded: boolean;
   explodeAmount?: number;
@@ -172,6 +125,7 @@ type StrandProps = {
   tensionMap?: boolean;
   aclState?: AclState;
   onSelect: (key: StructureKey) => void;
+  onEntitySelect: (id: string | null) => void;
   onHover: (label: string | null) => void;
 };
 
@@ -182,6 +136,7 @@ function SoftStrand({
   radius = 0.003,
   category = "ligament",
   selected,
+  selectedEntity,
   xray,
   exploded,
   explodeAmount,
@@ -189,6 +144,7 @@ function SoftStrand({
   tensionMap = false,
   aclState = "normal",
   onSelect,
+  onEntitySelect,
   onHover,
 }: StrandProps) {
   const isAcl = name.startsWith("ACL");
@@ -259,7 +215,8 @@ function SoftStrand({
 
   useEffect(() => () => geometries.forEach((geometry) => geometry.dispose()), [geometries]);
   useEffect(() => () => fascicleGeometries.forEach((geometry) => geometry.dispose()), [fascicleGeometries]);
-  const active = selected === "all" || selected === category;
+  const entityId = entityIdForModelName(name);
+  const active = selected === "all" || (selected === category && (!selectedEntity || selectedEntity === entityId));
   const fibreTexture = useMemo(() => createTissueTexture("ligament"), []);
   useEffect(() => () => fibreTexture.dispose(), [fibreTexture]);
   useFrame((state) => {
@@ -286,6 +243,7 @@ function SoftStrand({
       onClick={(event) => {
         event.stopPropagation();
         onSelect(category);
+        onEntitySelect(entityId);
       }}
     >
       {geometries.map((geometry, index) => (
@@ -552,8 +510,9 @@ function createMuscleSurface(curve: THREE.CatmullRomCurve3, radius: number, dept
   return { geometry, frames, segments };
 }
 
-function MuscleBundle({ muscle, selected, xray, exploded, explodeAmount, flexion, onSelect, onHover }: { muscle: MusclePath } & Pick<KneeModelProps, "selected" | "xray" | "exploded" | "explodeAmount" | "flexion" | "onSelect" | "onHover">) {
-  const active = selected === "all" || selected === "muscle";
+function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explodeAmount, flexion, onSelect, onEntitySelect, onHover }: { muscle: MusclePath } & Pick<KneeModelProps, "selected" | "selectedEntity" | "xray" | "exploded" | "explodeAmount" | "flexion" | "onSelect" | "onEntitySelect" | "onHover">) {
+  const entityId = entityIdForModelName(muscle.name);
+  const active = selected === "all" || (selected === "muscle" && (!selectedEntity || selectedEntity === entityId));
   const explosion = explodeAmount ?? (exploded ? 1 : 0);
   const muscleTexture = useMemo(() => createTissueTexture("muscle"), []);
   const generated = useMemo(() => {
@@ -609,6 +568,7 @@ function MuscleBundle({ muscle, selected, xray, exploded, explodeAmount, flexion
       onClick={(event) => {
         event.stopPropagation();
         onSelect("muscle");
+        onEntitySelect(entityId);
       }}
     >
       <mesh geometry={generated.body} castShadow receiveShadow>
@@ -626,7 +586,7 @@ function MuscleBundle({ muscle, selected, xray, exploded, explodeAmount, flexion
           opacity={!active ? 0.035 : xray ? 0.16 : 0.86}
           depthWrite={active && !xray}
           emissive={active && selected === "muscle" ? muscle.color : "#000000"}
-          emissiveIntensity={active && selected === "muscle" ? 0.055 : 0}
+          emissiveIntensity={active && selectedEntity === entityId ? 0.22 : active && selected === "muscle" ? 0.055 : 0}
         />
       </mesh>
       {generated.fibres.map((geometry, index) => (
@@ -676,11 +636,13 @@ function isAnnotation(name: string) {
 
 type KneeModelProps = {
   selected: StructureKey;
+  selectedEntity: string | null;
   xray: boolean;
   exploded: boolean;
   explodeAmount?: number;
   flexion: number;
   onSelect: (key: StructureKey) => void;
+  onEntitySelect: (id: string | null) => void;
   onHover: (label: string | null) => void;
   viewRotation?: number;
   showMotionGhost?: boolean;
@@ -719,8 +681,23 @@ const labelsByStructure: Record<StructureKey, { label: string; position: [number
   ],
 };
 
-function AnatomyLabels({ selected, muscleScope }: { selected: StructureKey; muscleScope: MuscleScope }) {
-  const labels = selected === "muscle" && muscleScope === "regional"
+const entityLabelPositions: Record<string, { label: string; position: [number, number, number] }> = {
+  acl: { label: "ACL", position: [0.15, -0.415, -0.005] },
+  pcl: { label: "PCL", position: [0.14, -0.42, -0.04] },
+  mcl: { label: "MCL", position: [0.09, -0.44, -0.01] },
+  lcl: { label: "LCL", position: [0.195, -0.43, -0.03] },
+  "rectus-femoris": { label: "RECTUS FEMORIS", position: [0.145, -0.17, 0.07] },
+  "vastus-medialis": { label: "VASTUS MEDIALIS", position: [0.105, -0.25, 0.045] },
+  "vastus-lateralis": { label: "VASTUS LATERALIS", position: [0.19, -0.2, 0.035] },
+  "biceps-femoris": { label: "BICEPS FEMORIS", position: [0.195, -0.27, -0.085] },
+  semitendinosus: { label: "SEMITENDINOSUS", position: [0.1, -0.28, -0.09] },
+  gastrocnemius: { label: "GASTROCNEMIUS", position: [0.15, -0.61, -0.09] },
+};
+
+function AnatomyLabels({ selected, selectedEntity, muscleScope }: { selected: StructureKey; selectedEntity: string | null; muscleScope: MuscleScope }) {
+  const labels = selectedEntity && entityLabelPositions[selectedEntity]
+    ? [entityLabelPositions[selectedEntity]]
+    : selected === "muscle" && muscleScope === "regional"
     ? [
         { label: "GASTROCNEMIUS", position: [0.15, -0.61, -0.09] as [number, number, number] },
         { label: "SOLEUS", position: [0.15, -0.66, -0.105] as [number, number, number] },
@@ -750,11 +727,13 @@ function AnatomyLabels({ selected, muscleScope }: { selected: StructureKey; musc
 
 function KneeModel({
   selected,
+  selectedEntity,
   xray,
   exploded,
   explodeAmount,
   flexion,
   onSelect,
+  onEntitySelect,
   onHover,
   viewRotation = -0.2,
   showMotionGhost = false,
@@ -943,6 +922,7 @@ function KneeModel({
           />
           <SoftTissues
             selected={selected}
+            selectedEntity={selectedEntity}
             xray={xray}
             exploded={exploded}
             explodeAmount={explodeAmount}
@@ -951,9 +931,10 @@ function KneeModel({
             aclState={aclState}
             muscleScope={muscleScope}
             onSelect={onSelect}
+            onEntitySelect={onEntitySelect}
             onHover={onHover}
           />
-          {showLabels && <AnatomyLabels selected={selected} muscleScope={muscleScope} />}
+          {showLabels && <AnatomyLabels selected={selected} selectedEntity={selectedEntity} muscleScope={muscleScope} />}
         </group>
       </Center>
     </group>
@@ -961,54 +942,49 @@ function KneeModel({
 }
 
 function Scene({ stableView = false, ...props }: KneeModelProps & { stableView?: boolean }) {
+  const performanceMode = usePerformanceMode();
+  const { ref, visible } = useVisibleCanvas();
   return (
-    <Canvas
-      camera={{ position: [0.2, 0.05, 3.9], fov: 30 }}
-      dpr={[1, 1.8]}
-      gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-    >
-      <ambientLight intensity={1.25} />
-      <directionalLight position={[3, 4, 5]} intensity={4.2} color="#f4f6ff" />
-      <directionalLight position={[-4, 1, -3]} intensity={2.5} color="#69d2ff" />
-      <pointLight position={[0, -2, 2]} intensity={1.8} color="#9c8cff" />
-      <Sparkles count={75} scale={[3.2, 4.4, 2]} size={1.35} speed={0.18} opacity={0.35} color="#8fb5ff" />
-      <Suspense
-        fallback={
-          <Html center>
-            <div className="model-loading">Preparing anatomy</div>
-          </Html>
-        }
+    <div ref={ref} className="scene-frame" data-quality={performanceMode}>
+      <Canvas
+        camera={{ position: [0.2, 0.05, 3.9], fov: 30 }}
+        dpr={performanceMode === "reduced" ? [1, 1.25] : [1, 1.8]}
+        frameloop={visible ? "always" : "never"}
+        gl={{ antialias: performanceMode === "full", alpha: true, powerPreference: "high-performance" }}
       >
-        <Float
-          speed={stableView ? 0 : 0.85}
-          rotationIntensity={stableView ? 0 : 0.025}
-          floatIntensity={stableView ? 0 : 0.06}
-        >
-          <Bounds fit clip observe margin={1.22}>
-            <KneeModel {...props} />
-          </Bounds>
-        </Float>
-      </Suspense>
-      <OrbitControls
-        makeDefault
-        enablePan={false}
-        enableZoom
-        minDistance={2.4}
-        maxDistance={6}
-        enableDamping
-        dampingFactor={0.09}
-        rotateSpeed={0.48}
-        zoomSpeed={0.7}
-        minPolarAngle={Math.PI * 0.25}
-        maxPolarAngle={Math.PI * 0.75}
-        minAzimuthAngle={-Math.PI * 0.72}
-        maxAzimuthAngle={Math.PI * 0.72}
-        mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
-        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
-        onStart={() => document.body.classList.add("is-orbiting")}
-        onEnd={() => document.body.classList.remove("is-orbiting")}
-      />
-    </Canvas>
+        <ambientLight intensity={1.25} />
+        <directionalLight position={[3, 4, 5]} intensity={4.2} color="#f4f6ff" />
+        <directionalLight position={[-4, 1, -3]} intensity={2.5} color="#69d2ff" />
+        <pointLight position={[0, -2, 2]} intensity={1.8} color="#9c8cff" />
+        <Sparkles count={performanceMode === "reduced" ? 20 : 75} scale={[3.2, 4.4, 2]} size={1.35} speed={0.18} opacity={0.35} color="#8fb5ff" />
+        <Suspense fallback={<Html center><div className="model-loading">Preparing anatomy</div></Html>}>
+          <Float speed={stableView || performanceMode === "reduced" ? 0 : 0.85} rotationIntensity={stableView ? 0 : 0.025} floatIntensity={stableView ? 0 : 0.06}>
+            <Bounds fit clip observe margin={1.22}>
+              <KneeModel {...props} />
+            </Bounds>
+          </Float>
+        </Suspense>
+        <OrbitControls
+          makeDefault
+          enablePan={false}
+          enableZoom
+          minDistance={2.4}
+          maxDistance={6}
+          enableDamping
+          dampingFactor={0.09}
+          rotateSpeed={0.48}
+          zoomSpeed={0.7}
+          minPolarAngle={Math.PI * 0.25}
+          maxPolarAngle={Math.PI * 0.75}
+          minAzimuthAngle={-Math.PI * 0.72}
+          maxAzimuthAngle={Math.PI * 0.72}
+          mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
+          touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
+          onStart={() => document.body.classList.add("is-orbiting")}
+          onEnd={() => document.body.classList.remove("is-orbiting")}
+        />
+      </Canvas>
+    </div>
   );
 }
 
@@ -1037,6 +1013,7 @@ export default function App() {
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLElement>(null);
   const [selected, setSelected] = useState<StructureKey>("all");
+  const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [xray, setXray] = useState(false);
   const [exploded, setExploded] = useState(false);
   const [flexion, setFlexion] = useState(0);
@@ -1049,7 +1026,11 @@ export default function App() {
   const [aclState, setAclState] = useState<AclState>("normal");
   const [muscleScope, setMuscleScope] = useState<MuscleScope>("knee");
   const [layerProgress, setLayerProgress] = useState(0);
+  const [movementId, setMovementId] = useState<MovementPreset["id"]>("manual");
+  const performanceMode = usePerformanceMode();
   const active = structureByKey[selected];
+  const activeEntity = selectedEntity ? entityById[selectedEntity] : null;
+  const activeMovement = movementPresets.find((item) => item.id === movementId) ?? movementPresets[0];
   const layerStructures = structures.slice(1);
   const layerIndex = Math.min(layerStructures.length - 1, Math.floor(layerProgress * layerStructures.length));
   const layerSelected = layerStructures[layerIndex].key;
@@ -1079,6 +1060,40 @@ export default function App() {
     }, root);
     return () => context.revert();
   }, []);
+
+  useEffect(() => {
+    const preset = movementPresets.find((item) => item.id === movementId);
+    if (!preset || preset.id === "manual" || performanceMode === "reduced") return;
+    let frame = 0;
+    const startedAt = performance.now();
+    let lastUpdate = 0;
+    const animate = (now: number) => {
+      const elapsed = (now - startedAt) % preset.duration;
+      const progress = elapsed / preset.duration;
+      const segmentCount = preset.keyframes.length - 1;
+      const segment = Math.min(segmentCount - 1, Math.floor(progress * segmentCount));
+      const localProgress = progress * segmentCount - segment;
+      const eased = localProgress * localProgress * (3 - 2 * localProgress);
+      const angle = THREE.MathUtils.lerp(preset.keyframes[segment], preset.keyframes[segment + 1], eased);
+      if (now - lastUpdate >= 45) {
+        setFlexion(Math.round(angle));
+        lastUpdate = now;
+      }
+      frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [movementId, performanceMode]);
+
+  const selectLayer = (key: StructureKey) => {
+    setSelected(key);
+    setSelectedEntity(null);
+  };
+
+  const selectEntity = (id: string | null) => {
+    setSelectedEntity(id);
+    if (id) setSelected(entityById[id].layer);
+  };
 
   const updateScanner = (event: React.PointerEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -1136,11 +1151,13 @@ export default function App() {
           <div className="model-viewport" aria-label="Interactive three-dimensional model of a human knee">
             <Scene
               selected={selected}
+              selectedEntity={selectedEntity}
               xray={xray}
               exploded={exploded}
-              flexion={flexion}
+              flexion={0}
               muscleScope={muscleScope}
-              onSelect={setSelected}
+              onSelect={selectLayer}
+              onEntitySelect={selectEntity}
               onHover={setHovered}
             />
             <div className="model-orbit orbit-one" aria-hidden="true" />
@@ -1149,15 +1166,34 @@ export default function App() {
           </div>
 
           <aside className="structure-panel" aria-live="polite">
-            <p>{active.eyebrow}</p>
-            <h2>{active.label}</h2>
+            <p>{activeEntity ? `${active.eyebrow} / STRUCTURE` : active.eyebrow}</p>
+            <h2>{activeEntity?.shortLabel ?? active.label}</h2>
             <div className="panel-rule" />
-            <p className="panel-description">{active.description}</p>
-            <p className="panel-fact">{active.fact}</p>
-            {selected === "muscle" && (
+            <p className="panel-description">{activeEntity?.role ?? active.description}</p>
+            {activeEntity ? (
+              <div className="entity-evidence">
+                <dl>
+                  <div><dt>Origin</dt><dd>{activeEntity.origin}</dd></div>
+                  <div><dt>Insertion</dt><dd>{activeEntity.insertion}</dd></div>
+                </dl>
+                <a href={activeEntity.sourceUrl} target="_blank" rel="noreferrer">{activeEntity.sourceLabel} ↗</a>
+                <span>Educational reconstruction · not medical advice</span>
+              </div>
+            ) : <p className="panel-fact">{active.fact}</p>}
+            {selected === "muscle" && !activeEntity && (
               <div className="origin-disclaimer">
                 <span>PROXIMAL PATHS ARE CROPPED</span>
                 <p>Rectus femoris continues to the pelvis; biceps femoris long head, semitendinosus and semimembranosus continue to the ischial tuberosity.</p>
+              </div>
+            )}
+            {(selected === "ligament" || selected === "muscle") && (
+              <div className="entity-picker" role="group" aria-label={`Choose an individual ${selected}`}>
+                <button type="button" className={!selectedEntity ? "active" : ""} onClick={() => setSelectedEntity(null)}>All</button>
+                {anatomyEntities.filter((entity) => entity.layer === selected).map((entity) => (
+                  <button key={entity.id} type="button" className={selectedEntity === entity.id ? "active" : ""} onClick={() => selectEntity(entity.id)}>
+                    {entity.shortLabel}
+                  </button>
+                ))}
               </div>
             )}
           </aside>
@@ -1168,7 +1204,7 @@ export default function App() {
                 key={structure.key}
                 type="button"
                 className={selected === structure.key ? "active" : ""}
-                onClick={() => setSelected(structure.key)}
+                onClick={() => selectLayer(structure.key)}
               >
                 <span className="tab-index">0{structures.indexOf(structure) + 1}</span>
                 {structure.label}
@@ -1237,11 +1273,13 @@ export default function App() {
                 <Scene
                   key={motionViewKey}
                   selected={selected}
+                  selectedEntity={selectedEntity}
                   xray={xray}
                   exploded={exploded}
                   flexion={flexion}
                   muscleScope={muscleScope}
-                  onSelect={setSelected}
+                  onSelect={selectLayer}
+                  onEntitySelect={selectEntity}
                   onHover={setHovered}
                   viewRotation={motionViewRotation[motionView]}
                   stableView
@@ -1261,6 +1299,28 @@ export default function App() {
             </div>
 
             <div className="motion-control">
+              <div className="movement-presets">
+                <div className="injury-head">
+                  <p>MOVEMENT</p>
+                  <span>EDUCATIONAL</span>
+                </div>
+                <div className="preset-options" role="group" aria-label="Choose a movement preset">
+                  {movementPresets.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className={movementId === preset.id ? "active" : ""}
+                      onClick={() => {
+                        setMovementId(preset.id);
+                        if (preset.id !== "manual") setMotionViewPreset("side");
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <p>{performanceMode === "reduced" && movementId !== "manual" ? "Animation is paused because reduced-motion mode is active." : activeMovement.description}</p>
+              </div>
               <div className="angle-readout">
                 <span>{String(flexion).padStart(3, "0")}</span>
                 <sup>°</sup>
@@ -1273,7 +1333,10 @@ export default function App() {
                 max="130"
                 step="1"
                 value={flexion}
-                onChange={(event) => setFlexion(Number(event.target.value))}
+                onChange={(event) => {
+                  setMovementId("manual");
+                  setFlexion(Number(event.target.value));
+                }}
                 style={{ "--progress": `${(flexion / 130) * 100}%` } as React.CSSProperties}
               />
               <div className="range-scale">
@@ -1289,7 +1352,7 @@ export default function App() {
                       key={structure.key}
                       type="button"
                       className={selected === structure.key ? "active" : ""}
-                      onClick={() => setSelected(structure.key)}
+                      onClick={() => selectLayer(structure.key)}
                     >
                       {structure.label}
                     </button>
@@ -1344,6 +1407,7 @@ export default function App() {
                       onClick={() => {
                         setAclState(state);
                         setSelected("ligament");
+                        setSelectedEntity("acl");
                       }}
                     >
                       {state}
@@ -1366,7 +1430,7 @@ export default function App() {
 
               <p className="motion-state">
                 <span>{flexion < 15 ? "Near full extension" : flexion < 70 ? "Functional flexion" : "Deep flexion"}</span>
-                <span>{structureByKey[selected].label}</span>
+                <span>{activeEntity?.shortLabel ?? structureByKey[selected].label}</span>
               </p>
             </div>
           </div>
@@ -1382,12 +1446,14 @@ export default function App() {
               <div className="layer-scene">
                 <Scene
                   selected={layerSelected}
+                  selectedEntity={null}
                   xray={false}
                   exploded={false}
                   explodeAmount={layerProgress}
                   flexion={0}
                   muscleScope={muscleScope}
-                  onSelect={setSelected}
+                  onSelect={selectLayer}
+                  onEntitySelect={selectEntity}
                   onHover={setHovered}
                   viewRotation={-0.55}
                   showLabels
@@ -1410,7 +1476,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      setSelected(structure.key);
+                      selectLayer(structure.key);
                       document.getElementById("explore")?.scrollIntoView({ behavior: "smooth" });
                     }}
                   >

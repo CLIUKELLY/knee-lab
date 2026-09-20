@@ -91,6 +91,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .mouse-hint span::after { content: ""; position: absolute; top: 6px; left: 8px; width: 2px; height: 5px; border-radius: 3px; background: var(--mint); animation: scroll-dot 1.8s ease-in-out infinite; }
 
 .model-viewport { position: relative; align-self: stretch; min-height: 640px; z-index: 2; }
+.scene-frame { position: absolute; inset: 0; width: 100%; height: 100%; }
 .model-viewport canvas { position: relative; z-index: 2; }
 .model-viewport::before {
   content: "";
@@ -119,6 +120,16 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .origin-disclaimer { margin-top: 22px; padding: 13px 0 0; border-top: 1px solid var(--line); }
 .origin-disclaimer span { color: var(--mint); font: .58rem "SFMono-Regular", Consolas, monospace; letter-spacing: .1em; }
 .origin-disclaimer p { margin: 8px 0 0; color: #737b91; font-size: .72rem; line-height: 1.55; }
+.entity-evidence { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.entity-evidence dl { display: grid; gap: 12px; margin: 0; }
+.entity-evidence dl > div { display: grid; gap: 4px; }
+.entity-evidence dt { color: var(--mint); font: .55rem "SFMono-Regular", Consolas, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.entity-evidence dd { margin: 0; color: #8f97ad; font-size: .7rem; line-height: 1.5; }
+.entity-evidence a { display: inline-block; margin-top: 14px; color: #b9caff; font-size: .65rem; }
+.entity-evidence > span { display: block; margin-top: 7px; color: #626a80; font: .52rem "SFMono-Regular", Consolas, monospace; letter-spacing: .04em; }
+.entity-picker { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.entity-picker button { padding: 6px 8px; color: #858da5; border: 1px solid var(--line); border-radius: 99px; background: transparent; font: .56rem "SFMono-Regular", Consolas, monospace; cursor: pointer; transition: 180ms ease; }
+.entity-picker button:hover, .entity-picker button.active { color: #071020; border-color: var(--mint); background: var(--mint); }
 
 .structure-tabs { position: relative; z-index: 5; grid-column: 1 / 3; display: flex; align-self: end; border-top: 1px solid var(--line); }
 .structure-tabs button { min-width: 145px; padding: 19px 24px; color: #848ca3; border: 0; border-right: 1px solid var(--line); background: transparent; cursor: pointer; text-align: left; transition: color 180ms ease, background 180ms ease; }
@@ -166,6 +177,12 @@ body.is-orbiting canvas { cursor: grabbing; }
 .angle-guide::after { content: "FLEXION"; position: absolute; bottom: 20px; color: rgba(143,181,255,.58); font-size: .55rem; letter-spacing: .1em; }
 .motion-hover-label { position: absolute; z-index: 6; left: 22px; bottom: 24px; max-width: calc(100% - 170px); padding: 8px 11px; color: var(--mint); border: 1px solid rgba(143,181,255,.32); background: rgba(5,6,17,.76); backdrop-filter: blur(10px); font: .68rem "SFMono-Regular", Consolas, monospace; letter-spacing: .05em; }
 .motion-control { position: relative; z-index: 3; padding: clamp(28px, 3.4vw, 52px); border-left: 1px solid rgba(25,38,72,.16); background: rgba(249,250,255,.8); backdrop-filter: blur(16px); }
+.motion-canvas .scene-frame, .layer-scene .scene-frame { position: absolute; inset: 0; }
+.movement-presets { margin-bottom: 38px; }
+.preset-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.preset-options button { min-height: 38px; padding: 8px 5px; color: #646e86; border: 1px solid rgba(25,38,72,.15); background: transparent; cursor: pointer; font: .58rem "SFMono-Regular", Consolas, monospace; letter-spacing: .04em; text-transform: uppercase; transition: 180ms ease; }
+.preset-options button:hover, .preset-options button.active { color: #fff; border-color: #375fd2; background: #375fd2; box-shadow: 0 8px 22px rgba(55,95,210,.16); }
+.movement-presets > p { margin: 10px 0 0; color: #747d93; font-size: .68rem; line-height: 1.5; }
 .angle-readout { display: flex; align-items: flex-start; margin-bottom: 42px; font: 300 clamp(4.7rem, 7vw, 8rem) "SFMono-Regular", Consolas, monospace; line-height: .8; letter-spacing: -.08em; }
 .angle-readout sup { margin: 5px 0 0 12px; color: #375fd2; font-size: 1.4rem; letter-spacing: 0; }
 .motion-control label { display: block; margin-bottom: 20px; color: #414b63; font: .76rem "SFMono-Regular", Consolas, monospace; letter-spacing: .12em; text-transform: uppercase; }
