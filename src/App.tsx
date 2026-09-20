@@ -33,6 +33,8 @@ const palette: Record<TissueKey, string> = {
   muscle: "#db7f78",
 };
 
+const MOTION_DURATION_SCALE = 3;
+
 function categoryForName(name: string): TissueKey | null {
   const normalized = name.toLowerCase();
   if (normalized.includes("meniscus")) return "meniscus";
@@ -1132,9 +1134,10 @@ export default function App() {
     let frame = 0;
     const startedAt = performance.now();
     let lastUpdate = 0;
+    const duration = preset.duration * MOTION_DURATION_SCALE;
     const animate = (now: number) => {
-      const elapsed = (now - startedAt) % preset.duration;
-      const progress = elapsed / preset.duration;
+      const elapsed = (now - startedAt) % duration;
+      const progress = elapsed / duration;
       const segmentCount = preset.keyframes.length - 1;
       const segment = Math.min(segmentCount - 1, Math.floor(progress * segmentCount));
       const localProgress = progress * segmentCount - segment;
