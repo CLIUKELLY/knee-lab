@@ -846,6 +846,7 @@ function KneeModel({
   }, [scene, surfaceTextures]);
 
   const motionGhosts = useMemo(() => {
+    if (!showMotionGhost) return [];
     return [0, 0.34, 0.68].map((trailProgress) => {
       const cloned = scene.clone(true);
       cloned.userData.trailProgress = trailProgress;
@@ -867,7 +868,7 @@ function KneeModel({
       });
       return cloned;
     });
-  }, [scene]);
+  }, [scene, showMotionGhost]);
 
   useEffect(() => {
     return () => {
@@ -888,22 +889,24 @@ function KneeModel({
     const bend = THREE.MathUtils.degToRad(flexion * -0.58);
     const pivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(bend, 0, 0)));
 
-    motionGhosts.forEach((ghost) => {
-      const trailProgress = ghost.userData.trailProgress as number;
-      ghost.visible = showMotionGhost;
-      const trailBend = bend * trailProgress;
-      const trailPivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(trailBend, 0, 0)));
-      ghost.traverse((object) => {
-        if (!(object instanceof THREE.Mesh) || !object.visible) return;
-        const basePosition = object.userData.basePosition as THREE.Vector3;
-        const baseRotation = object.userData.baseRotation as THREE.Euler;
-        object.position.copy(basePosition).add(trailPivotShift);
-        object.rotation.x = baseRotation.x + trailBend;
-        const reveal = THREE.MathUtils.smoothstep(flexion, 2, 24);
-        (object.material as THREE.MeshBasicMaterial).opacity =
-          reveal * (0.008 + (1 - trailProgress) * 0.02 + (flexion / 130) * 0.012);
+    if (showMotionGhost) {
+      motionGhosts.forEach((ghost) => {
+        const trailProgress = ghost.userData.trailProgress as number;
+        ghost.visible = true;
+        const trailBend = bend * trailProgress;
+        const trailPivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(trailBend, 0, 0)));
+        ghost.traverse((object) => {
+          if (!(object instanceof THREE.Mesh) || !object.visible) return;
+          const basePosition = object.userData.basePosition as THREE.Vector3;
+          const baseRotation = object.userData.baseRotation as THREE.Euler;
+          object.position.copy(basePosition).add(trailPivotShift);
+          object.rotation.x = baseRotation.x + trailBend;
+          const reveal = THREE.MathUtils.smoothstep(flexion, 2, 24);
+          (object.material as THREE.MeshBasicMaterial).opacity =
+            reveal * (0.008 + (1 - trailProgress) * 0.02 + (flexion / 130) * 0.012);
+        });
       });
-    });
+    }
 
     const explosion = explodeAmount ?? (exploded ? 1 : 0);
 
@@ -994,20 +997,20 @@ function KneeModel({
 
 function Scene({ stableView = false, ...props }: KneeModelProps & { stableView?: boolean }) {
   const performanceMode = usePerformanceMode();
-  const { ref, visible } = useVisibleCanvas();
+  const { ref, visible } = useVisibleCanvas("320px 0px");
   return (
     <div ref={ref} className="scene-frame" data-quality={performanceMode}>
-      <Canvas
+      {visible && <Canvas
         camera={{ position: [0.2, 0.05, 3.9], fov: 30 }}
         dpr={performanceMode === "reduced" ? [1, 1.25] : [1, 1.8]}
-        frameloop={visible ? "always" : "never"}
+        frameloop="always"
         gl={{ antialias: performanceMode === "full", alpha: true, powerPreference: "high-performance" }}
       >
         <ambientLight intensity={1.25} />
         <directionalLight position={[3, 4, 5]} intensity={4.2} color="#f4f6ff" />
         <directionalLight position={[-4, 1, -3]} intensity={2.5} color="#69d2ff" />
         <pointLight position={[0, -2, 2]} intensity={1.8} color="#9c8cff" />
-        <Sparkles count={performanceMode === "reduced" ? 20 : 75} scale={[3.2, 4.4, 2]} size={1.35} speed={0.18} opacity={0.35} color="#8fb5ff" />
+        {!stableView && <Sparkles count={performanceMode === "reduced" ? 20 : 75} scale={[3.2, 4.4, 2]} size={1.35} speed={0.18} opacity={0.35} color="#8fb5ff" />}
         <Suspense fallback={<Html center><div className="model-loading">Preparing anatomy</div></Html>}>
           <Float speed={stableView || performanceMode === "reduced" ? 0 : 0.85} rotationIntensity={stableView ? 0 : 0.025} floatIntensity={stableView ? 0 : 0.06}>
             <Bounds fit clip observe margin={1.22}>
@@ -1034,7 +1037,7 @@ function Scene({ stableView = false, ...props }: KneeModelProps & { stableView?:
           onStart={() => document.body.classList.add("is-orbiting")}
           onEnd={() => document.body.classList.remove("is-orbiting")}
         />
-      </Canvas>
+      </Canvas>}
     </div>
   );
 }
@@ -1336,7 +1339,6 @@ export default function App() {
                   tensionMap={tensionMap}
                   aclState={aclState}
                 />
-                <div className="motion-scan-beam" aria-hidden="true" />
                 {flexion > 8 && <div className="motion-ghost-key" aria-hidden="true"><i /> Light motion trail · extension reference</div>}
                 <div className="orbit-hint" aria-hidden="true">DRAG · ROTATE&nbsp;&nbsp; / &nbsp;&nbsp;WHEEL · ZOOM</div>
                 <div className="angle-guide" aria-hidden="true">

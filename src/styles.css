@@ -169,7 +169,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .motion-canvas::before { content: ""; position: absolute; z-index: 0; inset: 8% 7%; pointer-events: none; background-image: linear-gradient(rgba(143,181,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(143,181,255,.045) 1px, transparent 1px); background-size: 46px 46px; mask-image: radial-gradient(circle, black 10%, transparent 68%); }
 .motion-canvas canvas, .model-viewport canvas, .layer-sticky canvas { position: relative; z-index: 1; cursor: grab; touch-action: none; }
 body.is-orbiting canvas { cursor: grabbing; }
-.motion-scan-beam { position: absolute; z-index: 3; left: 7%; right: 7%; top: 12%; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(105,210,255,.28), var(--cyan), rgba(143,181,255,.25), transparent); box-shadow: 0 0 16px rgba(105,210,255,.32); animation: motion-scan 5.6s ease-in-out infinite; }
 .motion-ghost-key { position: absolute; z-index: 4; left: 22px; top: 22px; display: flex; align-items: center; gap: 8px; color: rgba(208,222,255,.52); font: .6rem "SFMono-Regular", Consolas, monospace; letter-spacing: .07em; text-transform: uppercase; }
 .motion-ghost-key i { width: 22px; height: 8px; border-top: 1px dashed rgba(189,238,255,.48); }
 .orbit-hint { position: absolute; z-index: 4; left: 22px; bottom: 24px; color: rgba(200,214,248,.44); font: .57rem "SFMono-Regular", Consolas, monospace; letter-spacing: .09em; }
@@ -265,7 +264,6 @@ footer a:hover { color: var(--mint); }
 @keyframes scroll-dot { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(8px); opacity: 1; } }
 @keyframes pulse-line { 0%, 100% { opacity: 0; transform: scaleX(.3); } 50% { opacity: 1; transform: scaleX(1); } }
 @keyframes live-pulse { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
-@keyframes motion-scan { 0%, 100% { top: 12%; opacity: 0; } 14% { opacity: .75; } 50% { opacity: 1; } 86% { opacity: .65; } 100% { top: 88%; opacity: 0; } }
 
 @media (max-width: 1000px) {
   .topbar { grid-template-columns: 1fr auto; }
