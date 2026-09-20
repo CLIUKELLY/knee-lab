@@ -696,6 +696,7 @@ type KneeModelProps = {
   exploded: boolean;
   explodeAmount?: number;
   flexion: number;
+  flexionSource?: FlexionRef;
   onSelect: (key: StructureKey) => void;
   onEntitySelect: (id: string | null) => void;
   onHover: (label: string | null) => void;
@@ -787,6 +788,7 @@ function KneeModel({
   exploded,
   explodeAmount,
   flexion,
+  flexionSource,
   onSelect,
   onEntitySelect,
   onHover,
@@ -891,7 +893,8 @@ function KneeModel({
   useFrame((_state, delta) => {
     if (!group.current) return;
     const ease = 1 - Math.pow(0.001, delta);
-    renderedFlexion.current = THREE.MathUtils.damp(renderedFlexion.current, flexion, 22, delta);
+    const targetFlexion = flexionSource?.current ?? flexion;
+    renderedFlexion.current = THREE.MathUtils.damp(renderedFlexion.current, targetFlexion, 22, delta);
     const visualFlexion = renderedFlexion.current;
 
     const bend = THREE.MathUtils.degToRad(visualFlexion * -0.58);
@@ -1080,6 +1083,7 @@ const quizOptions = [
 export default function App() {
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLElement>(null);
+  const motionFlexion = useRef(0);
   const [selected, setSelected] = useState<StructureKey>("all");
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [xray, setXray] = useState(false);
@@ -1143,7 +1147,8 @@ export default function App() {
       const localProgress = progress * segmentCount - segment;
       const eased = localProgress * localProgress * (3 - 2 * localProgress);
       const angle = THREE.MathUtils.lerp(preset.keyframes[segment], preset.keyframes[segment + 1], eased);
-      if (now - lastUpdate >= 45) {
+      motionFlexion.current = angle;
+      if (now - lastUpdate >= 100) {
         setFlexion(Math.round(angle));
         lastUpdate = now;
       }
@@ -1343,6 +1348,7 @@ export default function App() {
                   xray={xray}
                   exploded={exploded}
                   flexion={flexion}
+                  flexionSource={motionFlexion}
                   muscleScope={muscleScope}
                   onSelect={selectLayer}
                   onEntitySelect={selectEntity}
@@ -1400,7 +1406,9 @@ export default function App() {
                 value={flexion}
                 onChange={(event) => {
                   setMovementId("manual");
-                  setFlexion(Number(event.target.value));
+                  const angle = Number(event.target.value);
+                  motionFlexion.current = angle;
+                  setFlexion(angle);
                 }}
                 style={{ "--progress": `${(flexion / 130) * 100}%` } as React.CSSProperties}
               />
