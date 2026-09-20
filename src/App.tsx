@@ -23,6 +23,7 @@ import { useVisibleCanvas } from "./hooks/useVisibleCanvas";
 gsap.registerPlugin(ScrollTrigger);
 
 type TissueKey = Exclude<StructureKey, "all">;
+type FlexionRef = { current: number };
 
 const palette: Record<TissueKey, string> = {
   bone: "#eeeaf2",
@@ -165,6 +166,7 @@ type StrandProps = {
   exploded: boolean;
   explodeAmount?: number;
   flexion: number;
+  renderedFlexion: FlexionRef;
   tensionMap?: boolean;
   aclState?: AclState;
   onSelect: (key: StructureKey) => void;
@@ -184,6 +186,7 @@ function SoftStrand({
   exploded,
   explodeAmount,
   flexion,
+  renderedFlexion,
   tensionMap = false,
   aclState = "normal",
   onSelect,
@@ -262,8 +265,8 @@ function SoftStrand({
   useEffect(() => () => fibreTexture.dispose(), [fibreTexture]);
   useFrame((state) => {
     if (lowerPoint) {
-      geometries.forEach((geometry) => bendStableGeometry(geometry, flexion));
-      fascicleGeometries.forEach((geometry) => bendStableGeometry(geometry, flexion));
+      geometries.forEach((geometry) => bendStableGeometry(geometry, renderedFlexion.current));
+      fascicleGeometries.forEach((geometry) => bendStableGeometry(geometry, renderedFlexion.current));
     }
     fibreTexture.offset.x = tensionMap ? state.clock.elapsedTime * (0.012 + load * 0.018) : 0;
   });
@@ -303,16 +306,16 @@ function SoftStrand({
             sheen={0.72}
             sheenColor="#fff3d6"
             sheenRoughness={0.54}
-            transparent
-            opacity={!active ? 0.055 : xray ? 0.9 : 0.98}
-            depthWrite={active}
+            transparent={!active || xray}
+            opacity={!active ? 0.055 : xray ? 0.9 : 1}
+            depthWrite={active && !xray}
             emissive={active && (tensionMap || selected === category || (isAcl && aclState !== "normal")) ? color : "#000000"}
             emissiveIntensity={active ? (tensionMap ? 0.18 + load * 0.65 : isAcl && aclState !== "normal" ? 0.6 : selected === category ? 0.16 : 0) : 0}
           />
         </mesh>
       ))}
       {fascicleGeometries.map((geometry, index) => (
-        <mesh key={`fascicle-${index}`} geometry={geometry} frustumCulled={false}>
+        <mesh key={`fascicle-${index}`} geometry={geometry} frustumCulled={false} renderOrder={2}>
           <meshPhysicalMaterial
             color={color}
             map={fibreTexture}
@@ -555,7 +558,7 @@ function createMuscleSurface(curve: THREE.CatmullRomCurve3, radius: number, dept
   return { geometry, frames, segments };
 }
 
-function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explodeAmount, flexion, onSelect, onEntitySelect, onHover }: { muscle: MusclePath } & Pick<KneeModelProps, "selected" | "selectedEntity" | "xray" | "exploded" | "explodeAmount" | "flexion" | "onSelect" | "onEntitySelect" | "onHover">) {
+function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explodeAmount, renderedFlexion, onSelect, onEntitySelect, onHover }: { muscle: MusclePath; renderedFlexion: FlexionRef } & Pick<KneeModelProps, "selected" | "selectedEntity" | "xray" | "exploded" | "explodeAmount" | "onSelect" | "onEntitySelect" | "onHover">) {
   const entityId = entityIdForModelName(muscle.name);
   const active = selected === "all" || (selected === "muscle" && (!selectedEntity || selectedEntity === entityId));
   const explosion = explodeAmount ?? (exploded ? 1 : 0);
@@ -597,8 +600,8 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
   useEffect(() => () => muscleTexture.dispose(), [muscleTexture]);
   useFrame(() => {
     if (!muscle.lowerMode) return;
-    bendStableGeometry(generated.body, flexion);
-    generated.fibres.forEach((geometry) => bendStableGeometry(geometry, flexion));
+    bendStableGeometry(generated.body, renderedFlexion.current);
+    generated.fibres.forEach((geometry) => bendStableGeometry(geometry, renderedFlexion.current));
   });
 
   return (
@@ -630,15 +633,15 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
           sheen={0.38}
           sheenColor="#ffb6a9"
           sheenRoughness={0.82}
-          transparent
-          opacity={!active ? 0.035 : xray ? 0.16 : 0.86}
+          transparent={!active || xray}
+          opacity={!active ? 0.035 : xray ? 0.16 : 1}
           depthWrite={active && !xray}
           emissive={active && selected === "muscle" ? muscle.color : "#000000"}
           emissiveIntensity={active && selectedEntity === entityId ? 0.22 : active && selected === "muscle" ? 0.055 : 0}
         />
       </mesh>
       {generated.fibres.map((geometry, index) => (
-        <mesh key={index} geometry={geometry} frustumCulled={false}>
+        <mesh key={index} geometry={geometry} frustumCulled={false} renderOrder={2}>
           <meshPhysicalMaterial
             color="#f2a091"
             roughness={0.74}
@@ -654,8 +657,8 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
   );
 }
 
-function SoftTissues(props: KneeModelProps) {
-  const strands = useMemo<Omit<StrandProps, keyof KneeModelProps | "selected" | "xray" | "exploded" | "flexion" | "onSelect" | "onHover">[]>(() => {
+function SoftTissues(props: KneeModelProps & { renderedFlexion: FlexionRef }) {
+  const strands = useMemo<Omit<StrandProps, keyof KneeModelProps | "renderedFlexion">[]>(() => {
     const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
     return [
       { name: "ACL · Anterior cruciate ligament", points: [v(0.166, -0.397, -0.032), v(0.148, -0.414, -0.012), v(0.132, -0.438, -0.004)], radius: 0.0034 },
@@ -793,6 +796,7 @@ function KneeModel({
   muscleScope = "knee",
 }: KneeModelProps) {
   const group = useRef<THREE.Group>(null);
+  const renderedFlexion = useRef(flexion);
   const { scene } = useGLTF(`${import.meta.env.BASE_URL}models/knee.glb`);
   const surfaceTextures = useMemo(
     () => ({
@@ -885,8 +889,10 @@ function KneeModel({
   useFrame((_state, delta) => {
     if (!group.current) return;
     const ease = 1 - Math.pow(0.001, delta);
+    renderedFlexion.current = THREE.MathUtils.damp(renderedFlexion.current, flexion, 22, delta);
+    const visualFlexion = renderedFlexion.current;
 
-    const bend = THREE.MathUtils.degToRad(flexion * -0.58);
+    const bend = THREE.MathUtils.degToRad(visualFlexion * -0.58);
     const pivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(bend, 0, 0)));
 
     if (showMotionGhost) {
@@ -901,9 +907,9 @@ function KneeModel({
           const baseRotation = object.userData.baseRotation as THREE.Euler;
           object.position.copy(basePosition).add(trailPivotShift);
           object.rotation.x = baseRotation.x + trailBend;
-          const reveal = THREE.MathUtils.smoothstep(flexion, 2, 24);
+          const reveal = THREE.MathUtils.smoothstep(visualFlexion, 2, 24);
           (object.material as THREE.MeshBasicMaterial).opacity =
-            reveal * (0.008 + (1 - trailProgress) * 0.02 + (flexion / 130) * 0.012);
+            reveal * (0.008 + (1 - trailProgress) * 0.02 + (visualFlexion / 130) * 0.012);
         });
       });
     }
@@ -930,14 +936,19 @@ function KneeModel({
       }
 
       if (isLowerLeg) targetPosition.add(pivotShift);
-      object.position.lerp(targetPosition, ease);
-      object.rotation.x = THREE.MathUtils.lerp(object.rotation.x, baseRotation.x + (isLowerLeg ? bend : 0), ease);
+      object.position.copy(targetPosition);
+      object.rotation.x = baseRotation.x + (isLowerLeg ? bend : 0);
 
-      const defaultOpacity = category === "cartilage" ? 0.68 : 0.98;
+      const defaultOpacity = category === "cartilage" ? 0.68 : 1;
       const xrayOpacity = category === "bone" ? 0.12 : 0.84;
       const targetOpacity = !active ? 0.055 : xray ? xrayOpacity : defaultOpacity;
+      const shouldBeTransparent = !active || xray || category === "cartilage";
+      if (material.transparent !== shouldBeTransparent) {
+        material.transparent = shouldBeTransparent;
+        material.needsUpdate = true;
+      }
       material.opacity = THREE.MathUtils.lerp(material.opacity, targetOpacity, ease);
-      material.depthWrite = material.opacity > 0.5;
+      material.depthWrite = !shouldBeTransparent;
       material.wireframe = xray && category === "bone";
       material.emissive.set(active && selected !== "all" ? palette[category] : "#000000");
       material.emissiveIntensity = active && selected !== "all" ? 0.12 : 0;
@@ -981,6 +992,7 @@ function KneeModel({
             exploded={exploded}
             explodeAmount={explodeAmount}
             flexion={flexion}
+            renderedFlexion={renderedFlexion}
             tensionMap={tensionMap}
             aclState={aclState}
             muscleScope={muscleScope}
@@ -1334,12 +1346,12 @@ export default function App() {
                   onHover={setHovered}
                   viewRotation={motionViewRotation[motionView]}
                   stableView
-                  showMotionGhost
+                  showMotionGhost={movementId === "manual"}
                   showLabels={showLabels}
                   tensionMap={tensionMap}
                   aclState={aclState}
                 />
-                {flexion > 8 && <div className="motion-ghost-key" aria-hidden="true"><i /> Light motion trail · extension reference</div>}
+                {movementId === "manual" && flexion > 8 && <div className="motion-ghost-key" aria-hidden="true"><i /> Light motion trail · extension reference</div>}
                 <div className="orbit-hint" aria-hidden="true">DRAG · ROTATE&nbsp;&nbsp; / &nbsp;&nbsp;WHEEL · ZOOM</div>
                 <div className="angle-guide" aria-hidden="true">
                   <span>{flexion}°</span>
