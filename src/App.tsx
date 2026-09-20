@@ -105,9 +105,52 @@ function createTissueTexture(kind: TissueTextureKind) {
   return texture;
 }
 
-function rotateLowerPoint(point: THREE.Vector3, flexion: number) {
-  const bend = THREE.MathUtils.degToRad(flexion * -0.58);
-  return point.clone().sub(pivot).applyAxisAngle(new THREE.Vector3(1, 0, 0), bend).add(pivot);
+function bendStableGeometry(geometry: THREE.BufferGeometry, flexion: number) {
+  if (geometry.userData.lastFlexion === flexion) return;
+  const position = geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
+  if (!position) return;
+
+  if (!geometry.userData.basePositions) {
+    geometry.userData.basePositions = new Float32Array(position.array as ArrayLike<number>);
+    const normal = geometry.getAttribute("normal") as THREE.BufferAttribute | undefined;
+    if (normal) geometry.userData.baseNormals = new Float32Array(normal.array as ArrayLike<number>);
+  }
+
+  const basePositions = geometry.userData.basePositions as Float32Array;
+  const baseNormals = geometry.userData.baseNormals as Float32Array | undefined;
+  const normal = geometry.getAttribute("normal") as THREE.BufferAttribute | undefined;
+  const maxBend = THREE.MathUtils.degToRad(flexion * -0.58);
+
+  for (let index = 0; index < position.count; index += 1) {
+    const offset = index * 3;
+    const x = basePositions[offset];
+    const y = basePositions[offset + 1];
+    const z = basePositions[offset + 2];
+    const weight = THREE.MathUtils.smoothstep(pivot.y - y, 0.005, 0.115);
+    const bend = maxBend * weight;
+    const cosine = Math.cos(bend);
+    const sine = Math.sin(bend);
+    const relativeY = y - pivot.y;
+    const relativeZ = z - pivot.z;
+
+    position.setXYZ(
+      index,
+      x,
+      pivot.y + relativeY * cosine - relativeZ * sine,
+      pivot.z + relativeY * sine + relativeZ * cosine,
+    );
+
+    if (normal && baseNormals) {
+      const normalX = baseNormals[offset];
+      const normalY = baseNormals[offset + 1];
+      const normalZ = baseNormals[offset + 2];
+      normal.setXYZ(index, normalX, normalY * cosine - normalZ * sine, normalY * sine + normalZ * cosine);
+    }
+  }
+
+  position.needsUpdate = true;
+  if (normal) normal.needsUpdate = true;
+  geometry.userData.lastFlexion = flexion;
 }
 
 type StrandProps = {
@@ -160,9 +203,7 @@ function SoftStrand({
   }, [flexion, name]);
 
   const geometries = useMemo(() => {
-    const updated = points.map((point, index) =>
-      lowerPoint && index === points.length - 1 ? rotateLowerPoint(point, flexion) : point.clone(),
-    );
+    const updated = points.map((point) => point.clone());
     if (isAcl && aclState === "strain") updated[1].add(new THREE.Vector3(0.007, 0, 0.005));
     if (explosion) updated.forEach((point) => point.add(new THREE.Vector3(0, 0, 0.025 * explosion)));
     const curve = new THREE.CatmullRomCurve3(updated);
@@ -173,7 +214,7 @@ function SoftStrand({
       new THREE.TubeGeometry(first, 15, radius * 0.88, 8, false),
       new THREE.TubeGeometry(second, 15, radius * 0.88, 8, false),
     ];
-  }, [aclState, explosion, flexion, isAcl, isTorn, lowerPoint, points, radius]);
+  }, [aclState, explosion, isAcl, isTorn, points, radius]);
 
   const fascicleGeometries = useMemo(() => {
     const offsets = [
@@ -185,7 +226,7 @@ function SoftStrand({
 
     return offsets.flatMap((offset, offsetIndex) => {
       const updated = points.map((point, index) => {
-        const moved = lowerPoint && index === points.length - 1 ? rotateLowerPoint(point, flexion) : point.clone();
+        const moved = point.clone();
         const taper = 0.72 + Math.sin((index + offsetIndex) * 1.7) * 0.16;
         return moved.add(offset.clone().multiplyScalar(taper));
       });
@@ -211,7 +252,7 @@ function SoftStrand({
         ),
       ];
     });
-  }, [aclState, explosion, flexion, isAcl, isTorn, lowerPoint, points, radius]);
+  }, [aclState, explosion, isAcl, isTorn, points, radius]);
 
   useEffect(() => () => geometries.forEach((geometry) => geometry.dispose()), [geometries]);
   useEffect(() => () => fascicleGeometries.forEach((geometry) => geometry.dispose()), [fascicleGeometries]);
@@ -220,6 +261,10 @@ function SoftStrand({
   const fibreTexture = useMemo(() => createTissueTexture("ligament"), []);
   useEffect(() => () => fibreTexture.dispose(), [fibreTexture]);
   useFrame((state) => {
+    if (lowerPoint) {
+      geometries.forEach((geometry) => bendStableGeometry(geometry, flexion));
+      fascicleGeometries.forEach((geometry) => bendStableGeometry(geometry, flexion));
+    }
     fibreTexture.offset.x = tensionMap ? state.clock.elapsedTime * (0.012 + load * 0.018) : 0;
   });
   const heatColor = useMemo(
@@ -247,7 +292,7 @@ function SoftStrand({
       }}
     >
       {geometries.map((geometry, index) => (
-        <mesh key={index} geometry={geometry} castShadow>
+        <mesh key={index} geometry={geometry} castShadow frustumCulled={false}>
           <meshPhysicalMaterial
             color={color}
             map={fibreTexture}
@@ -267,7 +312,7 @@ function SoftStrand({
         </mesh>
       ))}
       {fascicleGeometries.map((geometry, index) => (
-        <mesh key={`fascicle-${index}`} geometry={geometry}>
+        <mesh key={`fascicle-${index}`} geometry={geometry} frustumCulled={false}>
           <meshPhysicalMaterial
             color={color}
             map={fibreTexture}
@@ -516,11 +561,9 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
   const explosion = explodeAmount ?? (exploded ? 1 : 0);
   const muscleTexture = useMemo(() => createTissueTexture("muscle"), []);
   const generated = useMemo(() => {
-    const points = muscle.points.map((point, index) => {
+    const points = muscle.points.map((point) => {
       const vector = new THREE.Vector3(...point);
-      const shouldRotate = muscle.lowerMode === "all" || (muscle.lowerMode === "distal" && index === muscle.points.length - 1);
-      const moved = shouldRotate ? rotateLowerPoint(vector, flexion) : vector;
-      return moved.add(new THREE.Vector3(0, 0, -0.035 * explosion));
+      return vector.add(new THREE.Vector3(0, 0, -0.035 * explosion));
     });
     const curve = new THREE.CatmullRomCurve3(points);
     const surface = createMuscleSurface(curve, muscle.radius, muscle.depth);
@@ -545,13 +588,18 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
       );
     });
     return { body: surface.geometry, fibres };
-  }, [explosion, flexion, muscle]);
+  }, [explosion, muscle]);
 
   useEffect(() => () => {
     generated.body.dispose();
     generated.fibres.forEach((geometry) => geometry.dispose());
   }, [generated]);
   useEffect(() => () => muscleTexture.dispose(), [muscleTexture]);
+  useFrame(() => {
+    if (!muscle.lowerMode) return;
+    bendStableGeometry(generated.body, flexion);
+    generated.fibres.forEach((geometry) => bendStableGeometry(geometry, flexion));
+  });
 
   return (
     <group
@@ -571,7 +619,7 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
         onEntitySelect(entityId);
       }}
     >
-      <mesh geometry={generated.body} castShadow receiveShadow>
+      <mesh geometry={generated.body} castShadow receiveShadow frustumCulled={false}>
         <meshPhysicalMaterial
           color={muscle.color}
           map={muscleTexture}
@@ -590,7 +638,7 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
         />
       </mesh>
       {generated.fibres.map((geometry, index) => (
-        <mesh key={index} geometry={geometry}>
+        <mesh key={index} geometry={geometry} frustumCulled={false}>
           <meshPhysicalMaterial
             color="#f2a091"
             roughness={0.74}
@@ -607,15 +655,17 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
 }
 
 function SoftTissues(props: KneeModelProps) {
-  const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
-  const strands: Omit<StrandProps, keyof KneeModelProps | "selected" | "xray" | "exploded" | "flexion" | "onSelect" | "onHover">[] = [
-    { name: "ACL · Anterior cruciate ligament", points: [v(0.166, -0.397, -0.032), v(0.148, -0.414, -0.012), v(0.132, -0.438, -0.004)], radius: 0.0034 },
-    { name: "PCL · Posterior cruciate ligament", points: [v(0.128, -0.399, -0.031), v(0.139, -0.419, -0.038), v(0.154, -0.437, -0.031)], radius: 0.0038 },
-    { name: "MCL · Medial collateral ligament", points: [v(0.093, -0.391, -0.018), v(0.091, -0.434, -0.012), v(0.103, -0.502, -0.004)], radius: 0.0031 },
-    { name: "LCL · Lateral collateral ligament", points: [v(0.179, -0.386, -0.021), v(0.192, -0.431, -0.027), v(0.206, -0.471, -0.035)], radius: 0.0028 },
-    { name: "Quadriceps tendon", points: [v(0.145, -0.285, 0.042), v(0.149, -0.324, 0.047), v(0.151, -0.361, 0.045)], lowerPoint: false, radius: 0.0062 },
-    { name: "Patellar tendon", points: [v(0.151, -0.407, 0.044), v(0.153, -0.454, 0.034), v(0.157, -0.505, 0.015)], radius: 0.006 },
-  ];
+  const strands = useMemo<Omit<StrandProps, keyof KneeModelProps | "selected" | "xray" | "exploded" | "flexion" | "onSelect" | "onHover">[]>(() => {
+    const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+    return [
+      { name: "ACL · Anterior cruciate ligament", points: [v(0.166, -0.397, -0.032), v(0.148, -0.414, -0.012), v(0.132, -0.438, -0.004)], radius: 0.0034 },
+      { name: "PCL · Posterior cruciate ligament", points: [v(0.128, -0.399, -0.031), v(0.139, -0.419, -0.038), v(0.154, -0.437, -0.031)], radius: 0.0038 },
+      { name: "MCL · Medial collateral ligament", points: [v(0.093, -0.391, -0.018), v(0.091, -0.434, -0.012), v(0.103, -0.502, -0.004)], radius: 0.0031 },
+      { name: "LCL · Lateral collateral ligament", points: [v(0.179, -0.386, -0.021), v(0.192, -0.431, -0.027), v(0.206, -0.471, -0.035)], radius: 0.0028 },
+      { name: "Quadriceps tendon", points: [v(0.145, -0.285, 0.042), v(0.149, -0.324, 0.047), v(0.151, -0.361, 0.045)], lowerPoint: false, radius: 0.0062 },
+      { name: "Patellar tendon", points: [v(0.151, -0.407, 0.044), v(0.153, -0.454, 0.034), v(0.157, -0.505, 0.015)], radius: 0.006 },
+    ];
+  }, []);
 
   return (
     <group>
@@ -840,7 +890,7 @@ function KneeModel({
 
     motionGhosts.forEach((ghost) => {
       const trailProgress = ghost.userData.trailProgress as number;
-      ghost.visible = showMotionGhost && flexion > 8;
+      ghost.visible = showMotionGhost;
       const trailBend = bend * trailProgress;
       const trailPivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(trailBend, 0, 0)));
       ghost.traverse((object) => {
@@ -849,8 +899,9 @@ function KneeModel({
         const baseRotation = object.userData.baseRotation as THREE.Euler;
         object.position.copy(basePosition).add(trailPivotShift);
         object.rotation.x = baseRotation.x + trailBend;
+        const reveal = THREE.MathUtils.smoothstep(flexion, 2, 24);
         (object.material as THREE.MeshBasicMaterial).opacity =
-          0.012 + (1 - trailProgress) * 0.025 + (flexion / 130) * 0.015;
+          reveal * (0.008 + (1 - trailProgress) * 0.02 + (flexion / 130) * 0.012);
       });
     });
 
@@ -1019,7 +1070,6 @@ export default function App() {
   const [flexion, setFlexion] = useState(0);
   const [hovered, setHovered] = useState<string | null>(null);
   const [quizAnswer, setQuizAnswer] = useState<boolean | null>(null);
-  const [motionViewKey, setMotionViewKey] = useState(0);
   const [motionView, setMotionView] = useState<MotionView>("side");
   const [showLabels, setShowLabels] = useState(true);
   const [tensionMap, setTensionMap] = useState(false);
@@ -1103,7 +1153,6 @@ export default function App() {
 
   const setMotionViewPreset = (view: MotionView) => {
     setMotionView(view);
-    setMotionViewKey((value) => value + 1);
   };
 
   const motionViewRotation: Record<MotionView, number> = {
@@ -1271,7 +1320,6 @@ export default function App() {
               </div>
               <div className="motion-canvas" aria-label="Live knee flexion model">
                 <Scene
-                  key={motionViewKey}
                   selected={selected}
                   selectedEntity={selectedEntity}
                   xray={xray}
