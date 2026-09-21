@@ -12,7 +12,6 @@ import {
   structureByKey,
   structures,
   type AclState,
-  type MotionView,
   type MuscleScope,
   type MovementPreset,
   type StructureKey,
@@ -1012,7 +1011,7 @@ function KneeModel({
   );
 }
 
-function Scene({ stableView = false, ...props }: KneeModelProps & { stableView?: boolean }) {
+function Scene({ stableView = false, lockRotation = false, ...props }: KneeModelProps & { stableView?: boolean; lockRotation?: boolean }) {
   const performanceMode = usePerformanceMode();
   const { ref, visible } = useVisibleCanvas("320px 0px");
   return (
@@ -1039,6 +1038,7 @@ function Scene({ stableView = false, ...props }: KneeModelProps & { stableView?:
           makeDefault
           enablePan={false}
           enableZoom
+          enableRotate={!lockRotation}
           minDistance={2.4}
           maxDistance={6}
           enableDamping
@@ -1051,7 +1051,9 @@ function Scene({ stableView = false, ...props }: KneeModelProps & { stableView?:
           maxAzimuthAngle={Math.PI * 0.72}
           mouseButtons={{ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
           touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
-          onStart={() => document.body.classList.add("is-orbiting")}
+          onStart={() => {
+            if (!lockRotation) document.body.classList.add("is-orbiting");
+          }}
           onEnd={() => document.body.classList.remove("is-orbiting")}
         />
       </Canvas>}
@@ -1091,7 +1093,6 @@ export default function App() {
   const [flexion, setFlexion] = useState(0);
   const [hovered, setHovered] = useState<string | null>(null);
   const [quizAnswer, setQuizAnswer] = useState<boolean | null>(null);
-  const [motionView, setMotionView] = useState<MotionView>("side");
   const [showLabels, setShowLabels] = useState(true);
   const [tensionMap, setTensionMap] = useState(false);
   const [aclState, setAclState] = useState<AclState>("normal");
@@ -1172,16 +1173,6 @@ export default function App() {
     const rect = event.currentTarget.getBoundingClientRect();
     event.currentTarget.style.setProperty("--scan-x", `${event.clientX - rect.left}px`);
     event.currentTarget.style.setProperty("--scan-y", `${event.clientY - rect.top}px`);
-  };
-
-  const setMotionViewPreset = (view: MotionView) => {
-    setMotionView(view);
-  };
-
-  const motionViewRotation: Record<MotionView, number> = {
-    side: -Math.PI / 2,
-    quarter: -Math.PI / 4,
-    front: 0,
   };
 
   return (
@@ -1314,7 +1305,7 @@ export default function App() {
             <p className="kicker">MOTION LAB</p>
             <h2>Move it.<br />See it respond.</h2>
             <p>
-              The knee is often described as a hinge, but flexion also includes subtle rolling, gliding and rotation.
+              This simplified motion view stays locked to one side and isolates flexion in a single plane.
               Adjust the live model while keeping its tissues, angle and viewing tools in sight.
             </p>
           </div>
@@ -1327,19 +1318,7 @@ export default function App() {
             <div className="motion-visual">
               <div className="motion-visual-head">
                 <span><i aria-hidden="true" /> LIVE MODEL</span>
-                <div className="view-presets" role="group" aria-label="Model view">
-                  {(["side", "quarter", "front"] as MotionView[]).map((view) => (
-                    <button
-                      key={view}
-                      type="button"
-                      className={motionView === view ? "active" : ""}
-                      aria-pressed={motionView === view}
-                      onClick={() => setMotionViewPreset(view)}
-                    >
-                      {view === "quarter" ? "3/4" : view}
-                    </button>
-                  ))}
-                </div>
+                <span>FIXED SIDE VIEW</span>
               </div>
               <div className="motion-canvas" aria-label="Live knee flexion model">
                 <Scene
@@ -1353,15 +1332,16 @@ export default function App() {
                   onSelect={selectLayer}
                   onEntitySelect={selectEntity}
                   onHover={setHovered}
-                  viewRotation={motionViewRotation[motionView]}
+                  viewRotation={-Math.PI / 2}
                   stableView
+                  lockRotation
                   showMotionGhost={movementId === "manual"}
                   showLabels={showLabels}
                   tensionMap={tensionMap}
                   aclState={aclState}
                 />
                 {movementId === "manual" && flexion > 8 && <div className="motion-ghost-key" aria-hidden="true"><i /> Light motion trail · extension reference</div>}
-                <div className="orbit-hint" aria-hidden="true">DRAG · ROTATE&nbsp;&nbsp; / &nbsp;&nbsp;WHEEL · ZOOM</div>
+                <div className="orbit-hint" aria-hidden="true">FIXED VIEW&nbsp;&nbsp; / &nbsp;&nbsp;WHEEL · ZOOM</div>
                 <div className="angle-guide" aria-hidden="true">
                   <span>{flexion}°</span>
                 </div>
@@ -1383,7 +1363,6 @@ export default function App() {
                       className={movementId === preset.id ? "active" : ""}
                       onClick={() => {
                         setMovementId(preset.id);
-                        if (preset.id !== "manual") setMotionViewPreset("side");
                       }}
                     >
                       {preset.label}

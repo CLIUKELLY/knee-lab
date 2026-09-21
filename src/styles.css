@@ -168,6 +168,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .motion-canvas { position: absolute; inset: 52px 0 0; isolation: isolate; }
 .motion-canvas::before { content: ""; position: absolute; z-index: 0; inset: 8% 7%; pointer-events: none; background-image: linear-gradient(rgba(143,181,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(143,181,255,.045) 1px, transparent 1px); background-size: 46px 46px; mask-image: radial-gradient(circle, black 10%, transparent 68%); }
 .motion-canvas canvas, .model-viewport canvas, .layer-sticky canvas { position: relative; z-index: 1; cursor: grab; touch-action: none; }
+.motion-canvas canvas { cursor: default; }
 body.is-orbiting canvas { cursor: grabbing; }
 .motion-ghost-key { position: absolute; z-index: 4; left: 22px; top: 22px; display: flex; align-items: center; gap: 8px; color: rgba(208,222,255,.52); font: .6rem "SFMono-Regular", Consolas, monospace; letter-spacing: .07em; text-transform: uppercase; }
 .motion-ghost-key i { width: 22px; height: 8px; border-top: 1px dashed rgba(189,238,255,.48); }
