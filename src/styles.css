@@ -334,3 +334,7 @@ footer a:hover { color: var(--mint); }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
   .motion-scan-beam { display: none; }
 }
+
+/* Model overlays are readouts: they must never intercept pointer picking. */
+.hover-label, .motion-hover-label, .orbit-hint, .angle-guide,
+.motion-ghost-key, .layer-hud, .layer-progress { pointer-events: none; }

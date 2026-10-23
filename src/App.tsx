@@ -1,5 +1,5 @@
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Bounds, Center, Float, Html, OrbitControls, Sparkles, useGLTF } from "@react-three/drei";
+import { Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Bounds, Center, Html, OrbitControls, Sparkles, useGLTF } from "@react-three/drei";
 import { Canvas, ThreeEvent, useFrame } from "@react-three/fiber";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -34,6 +34,7 @@ const palette: Record<TissueKey, string> = {
 };
 
 const MOTION_DURATION_SCALE = 3;
+const ignoreRaycast: THREE.Mesh["raycast"] = () => {};
 
 function categoryForName(name: string): TissueKey | null {
   const normalized = name.toLowerCase();
@@ -268,13 +269,14 @@ function SoftStrand({
         onHover(null);
       }}
       onClick={(event) => {
+        if (event.delta > 4) return;
         event.stopPropagation();
         onSelect(category);
         onEntitySelect(entityId);
       }}
     >
       {geometries.map((geometry, index) => (
-        <mesh key={index} geometry={geometry} castShadow frustumCulled={false}>
+        <mesh key={index} geometry={geometry} raycast={active ? THREE.Mesh.prototype.raycast : ignoreRaycast} castShadow frustumCulled={false}>
           <meshPhysicalMaterial
             color={color}
             map={fibreTexture}
@@ -294,7 +296,7 @@ function SoftStrand({
         </mesh>
       ))}
       {fascicleGeometries.map((geometry, index) => (
-        <mesh key={`fascicle-${index}`} geometry={geometry} visible={active} frustumCulled={false} renderOrder={2}>
+        <mesh key={`fascicle-${index}`} geometry={geometry} visible={active} raycast={ignoreRaycast} frustumCulled={false} renderOrder={2}>
           <meshPhysicalMaterial
             color={color}
             map={fibreTexture}
@@ -608,12 +610,13 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
         onHover(null);
       }}
       onClick={(event) => {
+        if (event.delta > 4) return;
         event.stopPropagation();
         onSelect("muscle");
         onEntitySelect(entityId);
       }}
     >
-      <mesh geometry={generated.body} castShadow receiveShadow frustumCulled={false}>
+      <mesh geometry={generated.body} raycast={active ? THREE.Mesh.prototype.raycast : ignoreRaycast} castShadow receiveShadow frustumCulled={false}>
         <meshPhysicalMaterial
           color="#ffffff"
           vertexColors
@@ -633,7 +636,7 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
         />
       </mesh>
       {generated.fibres.map((geometry, index) => (
-        <mesh key={index} geometry={geometry} visible={active} frustumCulled={false} renderOrder={2}>
+        <mesh key={index} geometry={geometry} visible={active} raycast={ignoreRaycast} frustumCulled={false} renderOrder={2}>
           <meshPhysicalMaterial
             color="#f2a091"
             roughness={0.74}
@@ -931,6 +934,7 @@ function KneeModel({
       const category = object.userData.category as TissueKey;
       const material = object.material as THREE.MeshPhysicalMaterial;
       const active = selected === "all" || selected === category;
+      object.raycast = active ? THREE.Mesh.prototype.raycast : ignoreRaycast;
       const isLowerLeg = /tibia|fibula|meniscus/i.test(object.name);
       const isPatella = /patella/i.test(object.name);
       const basePosition = object.userData.basePosition as THREE.Vector3;
@@ -994,6 +998,7 @@ function KneeModel({
               onHover(null);
             }}
             onClick={(event: ThreeEvent<MouseEvent>) => {
+              if (event.delta > 4) return;
               const category = categoryForName(event.object.name);
               if (!category || isAnnotation(event.object.name)) return;
               event.stopPropagation();
@@ -1022,7 +1027,7 @@ function KneeModel({
   );
 }
 
-function Scene({ stableView = false, lockRotation = false, ...props }: KneeModelProps & { stableView?: boolean; lockRotation?: boolean }) {
+const Scene = memo(function Scene({ stableView = false, lockRotation = false, ...props }: KneeModelProps & { stableView?: boolean; lockRotation?: boolean }) {
   const performanceMode = usePerformanceMode();
   const { ref, visible } = useVisibleCanvas("320px 0px");
   return (
@@ -1040,11 +1045,9 @@ function Scene({ stableView = false, lockRotation = false, ...props }: KneeModel
         <pointLight position={[0, -2, 2]} intensity={0.8} color="#d9cbff" />
         {!stableView && <Sparkles count={performanceMode === "reduced" ? 20 : 75} scale={[3.2, 4.4, 2]} size={1.35} speed={0.18} opacity={0.35} color="#8fb5ff" />}
         <Suspense fallback={<Html center><div className="model-loading">Preparing anatomy</div></Html>}>
-          <Float speed={stableView || performanceMode === "reduced" ? 0 : 0.85} rotationIntensity={0} floatIntensity={0}>
-            <Bounds fit clip observe margin={1.22}>
-              <KneeModel {...props} />
-            </Bounds>
-          </Float>
+          <Bounds fit clip margin={1.22} maxDuration={0}>
+            <KneeModel {...props} />
+          </Bounds>
         </Suspense>
         <OrbitControls
           makeDefault
@@ -1071,7 +1074,7 @@ function Scene({ stableView = false, lockRotation = false, ...props }: KneeModel
       </Canvas>}
     </div>
   );
-}
+});
 
 function Icon({ name }: { name: "layers" | "scan" }) {
   if (name === "scan") {
@@ -1103,7 +1106,20 @@ export default function App() {
   const [xray, setXray] = useState(false);
   const [exploded, setExploded] = useState(false);
   const [flexion, setFlexion] = useState(0);
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [hovered, setHoveredState] = useState<string | null>(null);
+  const hoverClearFrame = useRef<number | null>(null);
+  const setHovered = useCallback((label: string | null) => {
+    if (hoverClearFrame.current !== null) cancelAnimationFrame(hoverClearFrame.current);
+    hoverClearFrame.current = null;
+    if (label !== null) setHoveredState(label);
+    else hoverClearFrame.current = requestAnimationFrame(() => {
+      setHoveredState(null);
+      hoverClearFrame.current = null;
+    });
+  }, []);
+  useEffect(() => () => {
+    if (hoverClearFrame.current !== null) cancelAnimationFrame(hoverClearFrame.current);
+  }, []);
   const [quizAnswer, setQuizAnswer] = useState<boolean | null>(null);
   const [showLabels, setShowLabels] = useState(true);
   const [tensionMap, setTensionMap] = useState(false);
@@ -1169,15 +1185,16 @@ export default function App() {
     return () => cancelAnimationFrame(frame);
   }, [movementId, performanceMode]);
 
-  const selectLayer = (key: StructureKey) => {
+  const selectLayer = useCallback((key: StructureKey) => {
     setSelected(key);
     setSelectedEntity(null);
-  };
+    setHovered(null);
+  }, [setHovered]);
 
-  const selectEntity = (id: string | null) => {
+  const selectEntity = useCallback((id: string | null) => {
     setSelectedEntity(id);
     if (id) setSelected(entityById[id].layer);
-  };
+  }, []);
 
   const updateScanner = (event: React.PointerEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
