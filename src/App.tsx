@@ -92,6 +92,7 @@ function createTissueTexture(kind: TissueTextureKind) {
   texture.needsUpdate = true;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
+  texture.generateMipmaps = true;
   texture.magFilter = THREE.LinearFilter;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.anisotropy = 8;
