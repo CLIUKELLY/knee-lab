@@ -16,6 +16,7 @@ import {
   type MovementPreset,
   type StructureKey,
 } from "./anatomy/data";
+import { sampleMotion, pivot, moveWithTibia, moveWithPatella, bendStableGeometry } from "./anatomy/motion";
 import { usePerformanceMode } from "./hooks/usePerformanceMode";
 import { useVisibleCanvas } from "./hooks/useVisibleCanvas";
 
@@ -41,8 +42,6 @@ function categoryForName(name: string): TissueKey | null {
   if (["femur", "tibia", "fibula", "patella"].some((part) => normalized.includes(part))) return "bone";
   return null;
 }
-
-const pivot = new THREE.Vector3(0.155, -0.36, 0);
 
 type TissueTextureKind = "ligament" | "muscle" | "bone" | "cartilage" | "meniscus";
 
@@ -107,52 +106,25 @@ function createTissueTexture(kind: TissueTextureKind) {
   return texture;
 }
 
-function bendStableGeometry(geometry: THREE.BufferGeometry, flexion: number) {
-  if (geometry.userData.lastFlexion === flexion) return;
-  const position = geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
-  if (!position) return;
-
-  if (!geometry.userData.basePositions) {
-    geometry.userData.basePositions = new Float32Array(position.array as ArrayLike<number>);
-    const normal = geometry.getAttribute("normal") as THREE.BufferAttribute | undefined;
-    if (normal) geometry.userData.baseNormals = new Float32Array(normal.array as ArrayLike<number>);
-  }
-
-  const basePositions = geometry.userData.basePositions as Float32Array;
-  const baseNormals = geometry.userData.baseNormals as Float32Array | undefined;
-  const normal = geometry.getAttribute("normal") as THREE.BufferAttribute | undefined;
-  const maxBend = THREE.MathUtils.degToRad(flexion * -0.58);
-
-  for (let index = 0; index < position.count; index += 1) {
-    const offset = index * 3;
-    const x = basePositions[offset];
-    const y = basePositions[offset + 1];
-    const z = basePositions[offset + 2];
-    const weight = THREE.MathUtils.smoothstep(pivot.y - y, 0.005, 0.115);
-    const bend = maxBend * weight;
-    const cosine = Math.cos(bend);
-    const sine = Math.sin(bend);
-    const relativeY = y - pivot.y;
-    const relativeZ = z - pivot.z;
-
-    position.setXYZ(
-      index,
-      x,
-      pivot.y + relativeY * cosine - relativeZ * sine,
-      pivot.z + relativeY * sine + relativeZ * cosine,
-    );
-
-    if (normal && baseNormals) {
-      const normalX = baseNormals[offset];
-      const normalY = baseNormals[offset + 1];
-      const normalZ = baseNormals[offset + 2];
-      normal.setXYZ(index, normalX, normalY * cosine - normalZ * sine, normalY * sine + normalZ * cosine);
+function createLigamentSurface(curve: THREE.CatmullRomCurve3, segments: number, radius: number, radialSegments: number, name: string) {
+  const geometry = new THREE.TubeGeometry(curve, segments, radius, radialSegments, false);
+  const position = geometry.getAttribute("position");
+  // Collateral ligament and extensor tendons have a broad, flattened profile.
+  const flat = /MCL|tendon/i.test(name);
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const centre = curve.getPointAt(t);
+    const flare = 1 + 0.35 * Math.pow(Math.abs(2 * t - 1), 3);
+    for (let j = 0; j <= radialSegments; j++) {
+      const k = i * (radialSegments + 1) + j;
+      position.setXYZ(k,
+        centre.x + (position.getX(k) - centre.x) * flare * (flat ? 1.8 : 1.12),
+        position.getY(k),
+        centre.z + (position.getZ(k) - centre.z) * (flat ? 0.48 : 0.82));
     }
   }
-
-  position.needsUpdate = true;
-  if (normal) normal.needsUpdate = true;
-  geometry.userData.lastFlexion = flexion;
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 type StrandProps = {
@@ -211,7 +183,7 @@ function SoftStrand({
     if (isAcl && aclState === "strain") updated[1].add(new THREE.Vector3(0.007, 0, 0.005));
     if (explosion) updated.forEach((point) => point.add(new THREE.Vector3(0, 0, 0.025 * explosion)));
     const curve = new THREE.CatmullRomCurve3(updated);
-    if (!isTorn) return [new THREE.TubeGeometry(curve, 28, radius, 8, false)];
+    if (!isTorn) return [createLigamentSurface(curve, 48, radius, 16, name)];
     const first = new THREE.CatmullRomCurve3([curve.getPoint(0), curve.getPoint(0.22), curve.getPoint(0.43)]);
     const second = new THREE.CatmullRomCurve3([curve.getPoint(0.57), curve.getPoint(0.78), curve.getPoint(1)]);
     return [
@@ -258,6 +230,11 @@ function SoftStrand({
     });
   }, [aclState, explosion, isAcl, isTorn, points, radius]);
 
+  // Share one attachment interval across intact/torn pieces and surface fibres.
+  // Otherwise each tear fragment would incorrectly acquire two new attachments.
+  [...geometries, ...fascicleGeometries].forEach((geometry) => {
+    geometry.userData.motionRange = { top: points[0].y, bottom: points[2].y };
+  });
   useEffect(() => () => geometries.forEach((geometry) => geometry.dispose()), [geometries]);
   useEffect(() => () => fascicleGeometries.forEach((geometry) => geometry.dispose()), [fascicleGeometries]);
   const entityId = entityIdForModelName(name);
@@ -265,9 +242,9 @@ function SoftStrand({
   const fibreTexture = useMemo(() => createTissueTexture("ligament"), []);
   useEffect(() => () => fibreTexture.dispose(), [fibreTexture]);
   useFrame((state) => {
-    if (lowerPoint) {
-      geometries.forEach((geometry) => bendStableGeometry(geometry, renderedFlexion.current));
-      fascicleGeometries.forEach((geometry) => bendStableGeometry(geometry, renderedFlexion.current));
+    if (lowerPoint || name.startsWith("Quadriceps")) {
+      geometries.forEach((geometry) => bendStableGeometry(geometry, renderedFlexion.current, name.startsWith("Patellar") ? "patellar" : name.startsWith("Quadriceps") ? "quadriceps" : "distal"));
+      fascicleGeometries.forEach((geometry) => bendStableGeometry(geometry, renderedFlexion.current, name.startsWith("Patellar") ? "patellar" : name.startsWith("Quadriceps") ? "quadriceps" : "distal"));
     }
     fibreTexture.offset.x = tensionMap ? state.clock.elapsedTime * (0.012 + load * 0.018) : 0;
   });
@@ -301,7 +278,7 @@ function SoftStrand({
             color={color}
             map={fibreTexture}
             bumpMap={fibreTexture}
-            bumpScale={0.0011}
+            bumpScale={0.00028}
             roughness={0.46}
             clearcoat={0.18}
             sheen={0.72}
@@ -316,7 +293,7 @@ function SoftStrand({
         </mesh>
       ))}
       {fascicleGeometries.map((geometry, index) => (
-        <mesh key={`fascicle-${index}`} geometry={geometry} frustumCulled={false} renderOrder={2}>
+        <mesh key={`fascicle-${index}`} geometry={geometry} visible={active} frustumCulled={false} renderOrder={2}>
           <meshPhysicalMaterial
             color={color}
             map={fibreTexture}
@@ -515,14 +492,14 @@ const musclePaths: MusclePath[] = [
 ];
 
 function muscleRadiusAt(t: number, radius: number) {
-  const belly = Math.pow(Math.max(0, Math.sin(Math.PI * t)), 0.58);
+  const belly = Math.pow(Math.max(0, Math.sin(Math.PI * THREE.MathUtils.smoothstep(t, 0.06, 0.94))), 0.8);
   const asymmetry = 0.92 + 0.08 * Math.sin((t - 0.18) * Math.PI);
   return radius * (0.09 + belly * 0.91) * asymmetry;
 }
 
 function createMuscleSurface(curve: THREE.CatmullRomCurve3, radius: number, depth: number) {
-  const segments = 34;
-  const radialSegments = 16;
+  const segments = 56;
+  const radialSegments = 24;
   const frames = curve.computeFrenetFrames(segments, false);
   const positions: number[] = [];
   const uvs: number[] = [];
@@ -571,8 +548,19 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
     });
     const curve = new THREE.CatmullRomCurve3(points);
     const surface = createMuscleSurface(curve, muscle.radius, muscle.depth);
-    const fibres = Array.from({ length: 7 }, (_, fibreIndex) => {
-      const baseAngle = (fibreIndex / 7) * Math.PI * 2;
+    const colours: number[] = [];
+    const baseColour = new THREE.Color(muscle.color);
+    const tendonColour = new THREE.Color("#e6d8bf");
+    const uv = surface.geometry.getAttribute("uv");
+    for (let i = 0; i < uv.count; i++) {
+      const t = uv.getY(i);
+      const tendon = 1 - THREE.MathUtils.smoothstep(Math.min(t, 1 - t), 0.035, 0.22);
+      const colour = baseColour.clone().lerp(tendonColour, tendon * 0.9);
+      colours.push(colour.r, colour.g, colour.b);
+    }
+    surface.geometry.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
+    const fibres = Array.from({ length: 10 }, (_, fibreIndex) => {
+      const baseAngle = (fibreIndex / 10) * Math.PI * 2;
       const fibrePoints = Array.from({ length: 20 }, (_, pointIndex) => {
         const t = 0.035 + (pointIndex / 19) * 0.93;
         const frameIndex = Math.min(surface.segments, Math.round(t * surface.segments));
@@ -600,9 +588,10 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
   }, [generated]);
   useEffect(() => () => muscleTexture.dispose(), [muscleTexture]);
   useFrame(() => {
-    if (!muscle.lowerMode) return;
-    bendStableGeometry(generated.body, renderedFlexion.current);
-    generated.fibres.forEach((geometry) => bendStableGeometry(geometry, renderedFlexion.current));
+    const mode = muscle.lowerMode === "all" && muscle.scope === "regional" && muscle.name !== "Plantaris"
+      ? "rigid" : muscle.lowerMode ?? "quadriceps";
+    bendStableGeometry(generated.body, renderedFlexion.current, mode);
+    generated.fibres.forEach((geometry) => bendStableGeometry(geometry, renderedFlexion.current, mode));
   });
 
   return (
@@ -625,10 +614,11 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
     >
       <mesh geometry={generated.body} castShadow receiveShadow frustumCulled={false}>
         <meshPhysicalMaterial
-          color={muscle.color}
+          color="#ffffff"
+          vertexColors
           map={muscleTexture}
           bumpMap={muscleTexture}
-          bumpScale={0.0014}
+          bumpScale={0.00045}
           roughness={0.68}
           clearcoat={0.035}
           sheen={0.38}
@@ -642,7 +632,7 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
         />
       </mesh>
       {generated.fibres.map((geometry, index) => (
-        <mesh key={index} geometry={geometry} frustumCulled={false} renderOrder={2}>
+        <mesh key={index} geometry={geometry} visible={active} frustumCulled={false} renderOrder={2}>
           <meshPhysicalMaterial
             color="#f2a091"
             roughness={0.74}
@@ -749,7 +739,19 @@ const entityLabelPositions: Record<string, { label: string; position: [number, n
   gastrocnemius: { label: "GASTROCNEMIUS", position: [0.15, -0.61, -0.09] },
 };
 
-function AnatomyLabels({ selected, selectedEntity, muscleScope }: { selected: StructureKey; selectedEntity: string | null; muscleScope: MuscleScope }) {
+function AnatomyLabels({ selected, selectedEntity, muscleScope, renderedFlexion }: { selected: StructureKey; selectedEntity: string | null; muscleScope: MuscleScope; renderedFlexion: FlexionRef }) {
+  const group = useRef<THREE.Group>(null);
+  useFrame(() => {
+    group.current?.children.forEach((child, index) => {
+      const item = labels[index];
+      if (!item) return;
+      const point = new THREE.Vector3(...item.position);
+      if (/PATELLA/.test(item.label)) moveWithPatella(point, renderedFlexion.current);
+      else if (/TIBIA|MENISC|SOLEUS|GASTROCNEMIUS|FIBULARIS/.test(item.label)) moveWithTibia(point, renderedFlexion.current);
+      else if (/ACL|PCL|MCL|LCL/.test(item.label)) point.lerp(moveWithTibia(point.clone(), renderedFlexion.current), 0.5);
+      child.position.copy(point);
+    });
+  });
   const labels = selectedEntity && entityLabelPositions[selectedEntity]
     ? [entityLabelPositions[selectedEntity]]
     : selected === "muscle" && muscleScope === "regional"
@@ -761,7 +763,7 @@ function AnatomyLabels({ selected, selectedEntity, muscleScope }: { selected: St
       ]
     : labelsByStructure[selected];
   return (
-    <group>
+    <group ref={group}>
       {labels.map((item) => (
         <Html
           key={item.label}
@@ -880,23 +882,26 @@ function KneeModel({
   useEffect(() => {
     return () => {
       model.traverse((object) => {
-        if (object instanceof THREE.Mesh) object.material.dispose();
-      });
-      motionGhosts.forEach((ghost) => ghost.traverse((object) => {
         if (object instanceof THREE.Mesh && object.visible) object.material.dispose();
-      }));
-      Object.values(surfaceTextures).forEach((texture) => texture.dispose());
+      });
     };
-  }, [model, motionGhosts, surfaceTextures]);
+  }, [model]);
+  useEffect(() => () => {
+    motionGhosts.forEach((ghost) => ghost.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.visible) object.material.dispose();
+    }));
+  }, [motionGhosts]);
+  useEffect(() => () => Object.values(surfaceTextures).forEach((texture) => texture.dispose()), [surfaceTextures]);
 
   useFrame((_state, delta) => {
     if (!group.current) return;
     const ease = 1 - Math.pow(0.001, delta);
     const targetFlexion = flexionSource?.current ?? flexion;
     renderedFlexion.current = THREE.MathUtils.damp(renderedFlexion.current, targetFlexion, 22, delta);
+    if (Math.abs(renderedFlexion.current - targetFlexion) < 0.01) renderedFlexion.current = targetFlexion;
     const visualFlexion = renderedFlexion.current;
 
-    const bend = THREE.MathUtils.degToRad(visualFlexion * -0.58);
+    const bend = THREE.MathUtils.degToRad(visualFlexion);
     const pivotShift = pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(bend, 0, 0)));
 
     if (showMotionGhost) {
@@ -925,7 +930,8 @@ function KneeModel({
       const category = object.userData.category as TissueKey;
       const material = object.material as THREE.MeshPhysicalMaterial;
       const active = selected === "all" || selected === category;
-      const isLowerLeg = /tibia|fibula/i.test(object.name);
+      const isLowerLeg = /tibia|fibula|meniscus/i.test(object.name);
+      const isPatella = /patella/i.test(object.name);
       const basePosition = object.userData.basePosition as THREE.Vector3;
       const baseRotation = object.userData.baseRotation as THREE.Euler;
       const targetPosition = basePosition.clone();
@@ -940,8 +946,12 @@ function KneeModel({
       }
 
       if (isLowerLeg) targetPosition.add(pivotShift);
+      if (isPatella) {
+        const patellaBend = bend * 0.62;
+        targetPosition.add(pivot.clone().sub(pivot.clone().applyEuler(new THREE.Euler(patellaBend, 0, 0))));
+      }
       object.position.copy(targetPosition);
-      object.rotation.x = baseRotation.x + (isLowerLeg ? bend : 0);
+      object.rotation.x = baseRotation.x + (isLowerLeg ? bend : isPatella ? bend * 0.62 : 0);
 
       const defaultOpacity = category === "cartilage" ? 0.68 : 1;
       const xrayOpacity = category === "bone" ? 0.12 : 0.84;
@@ -1004,7 +1014,7 @@ function KneeModel({
             onEntitySelect={onEntitySelect}
             onHover={onHover}
           />
-          {showLabels && <AnatomyLabels selected={selected} selectedEntity={selectedEntity} muscleScope={muscleScope} />}
+          {showLabels && <AnatomyLabels selected={selected} selectedEntity={selectedEntity} muscleScope={muscleScope} renderedFlexion={renderedFlexion} />}
         </group>
       </Center>
     </group>
@@ -1018,17 +1028,18 @@ function Scene({ stableView = false, lockRotation = false, ...props }: KneeModel
     <div ref={ref} className="scene-frame" data-quality={performanceMode}>
       {visible && <Canvas
         camera={{ position: [0.2, 0.05, 3.9], fov: 30 }}
-        dpr={performanceMode === "reduced" ? [1, 1.25] : [1, 1.8]}
+        dpr={performanceMode === "reduced" ? [1, 1.25] : [1, 1.5]}
         frameloop="always"
-        gl={{ antialias: performanceMode === "full", alpha: true, powerPreference: "high-performance" }}
+        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       >
-        <ambientLight intensity={1.25} />
-        <directionalLight position={[3, 4, 5]} intensity={4.2} color="#f4f6ff" />
-        <directionalLight position={[-4, 1, -3]} intensity={2.5} color="#69d2ff" />
-        <pointLight position={[0, -2, 2]} intensity={1.8} color="#9c8cff" />
+        <ambientLight intensity={0.85} />
+        <hemisphereLight args={["#f3f6ff", "#343047", 1.25]} />
+        <directionalLight position={[3, 4, 5]} intensity={2.8} color="#f4f6ff" />
+        <directionalLight position={[-4, 1, -3]} intensity={1.4} color="#c7dcff" />
+        <pointLight position={[0, -2, 2]} intensity={0.8} color="#d9cbff" />
         {!stableView && <Sparkles count={performanceMode === "reduced" ? 20 : 75} scale={[3.2, 4.4, 2]} size={1.35} speed={0.18} opacity={0.35} color="#8fb5ff" />}
         <Suspense fallback={<Html center><div className="model-loading">Preparing anatomy</div></Html>}>
-          <Float speed={stableView || performanceMode === "reduced" ? 0 : 0.85} rotationIntensity={stableView ? 0 : 0.025} floatIntensity={stableView ? 0 : 0.06}>
+          <Float speed={stableView || performanceMode === "reduced" ? 0 : 0.85} rotationIntensity={0} floatIntensity={0}>
             <Bounds fit clip observe margin={1.22}>
               <KneeModel {...props} />
             </Bounds>
@@ -1042,7 +1053,7 @@ function Scene({ stableView = false, lockRotation = false, ...props }: KneeModel
           minDistance={2.4}
           maxDistance={6}
           enableDamping
-          dampingFactor={0.09}
+          dampingFactor={0.065}
           rotateSpeed={0.48}
           zoomSpeed={0.7}
           minPolarAngle={Math.PI * 0.25}
@@ -1138,16 +1149,14 @@ export default function App() {
     if (!preset || preset.id === "manual" || performanceMode === "reduced") return;
     let frame = 0;
     const startedAt = performance.now();
+    const startingAngle = motionFlexion.current;
     let lastUpdate = 0;
     const duration = preset.duration * MOTION_DURATION_SCALE;
     const animate = (now: number) => {
       const elapsed = (now - startedAt) % duration;
       const progress = elapsed / duration;
-      const segmentCount = preset.keyframes.length - 1;
-      const segment = Math.min(segmentCount - 1, Math.floor(progress * segmentCount));
-      const localProgress = progress * segmentCount - segment;
-      const eased = localProgress * localProgress * (3 - 2 * localProgress);
-      const angle = THREE.MathUtils.lerp(preset.keyframes[segment], preset.keyframes[segment + 1], eased);
+      const blend = THREE.MathUtils.smoothstep(now - startedAt, 0, 650);
+      const angle = THREE.MathUtils.lerp(startingAngle, sampleMotion(preset.keyframes, progress), blend);
       motionFlexion.current = angle;
       if (now - lastUpdate >= 100) {
         setFlexion(Math.round(angle));
@@ -1335,12 +1344,12 @@ export default function App() {
                   viewRotation={-Math.PI / 2}
                   stableView
                   lockRotation
-                  showMotionGhost={movementId === "manual"}
+                  showMotionGhost={false}
                   showLabels={showLabels}
                   tensionMap={tensionMap}
                   aclState={aclState}
                 />
-                {movementId === "manual" && flexion > 8 && <div className="motion-ghost-key" aria-hidden="true"><i /> Light motion trail · extension reference</div>}
+
                 <div className="orbit-hint" aria-hidden="true">FIXED VIEW&nbsp;&nbsp; / &nbsp;&nbsp;WHEEL · ZOOM</div>
                 <div className="angle-guide" aria-hidden="true">
                   <span>{flexion}°</span>
