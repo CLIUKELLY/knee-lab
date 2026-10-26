@@ -1,3 +1,5 @@
+import LowerBodyMotion from "./components/LowerBodyMotion";
+import { sampleLowerBody } from "./anatomy/lowerBody";
 import { useLanguage, LanguageToggle } from "./i18n/Language";
 import { Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Bounds, Center, Html, OrbitControls, Sparkles, useGLTF } from "@react-three/drei";
@@ -6,7 +8,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import * as THREE from "three";
 import { anatomyEntities, entityById, entityIdForModelName, movementPresets, structureByKey, structures, type AclState, type MuscleScope, type MovementPreset, type StructureKey, } from "./anatomy/data";
-import { sampleMotion, pivot, moveWithTibia, moveWithPatella, bendStableGeometry } from "./anatomy/motion";
+import { pivot, moveWithTibia, moveWithPatella, bendStableGeometry } from "./anatomy/motion";
 import { usePerformanceMode } from "./hooks/usePerformanceMode";
 import { useVisibleCanvas } from "./hooks/useVisibleCanvas";
 import AclExperiment from "./components/AclExperiment";
@@ -949,6 +951,8 @@ export default function App() {
     const root = useRef<HTMLDivElement>(null);
     const stage = useRef<HTMLElement>(null);
     const motionFlexion = useRef(0);
+    const motionPhase = useRef(0);
+    const [motionView, setMotionView] = useState<"body" | "knee">("body");
     const [selected, setSelected] = useState<StructureKey>("all");
     const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
     const [xray, setXray] = useState(false);
@@ -1030,18 +1034,23 @@ export default function App() {
     }, []);
     useEffect(() => {
         const preset = movementPresets.find((item) => item.id === movementId);
-        if (!preset || preset.id === "manual" || performanceMode === "reduced")
+        motionPhase.current = 0;
+        if (!preset || preset.id === "manual") return;
+        if (performanceMode === "reduced") {
+            const angle = sampleLowerBody(preset.id, 0).left.flexion;
+            motionFlexion.current = angle;
+            setFlexion(Math.round(angle));
             return;
+        }
         let frame = 0;
         const startedAt = performance.now();
-        const startingAngle = motionFlexion.current;
         let lastUpdate = 0;
         const duration = preset.duration * MOTION_DURATION_SCALE;
         const animate = (now: number) => {
             const elapsed = (now - startedAt) % duration;
             const progress = elapsed / duration;
-            const blend = THREE.MathUtils.smoothstep(now - startedAt, 0, 650);
-            const angle = THREE.MathUtils.lerp(startingAngle, sampleMotion(preset.keyframes, progress), blend);
+            motionPhase.current = progress;
+            const angle = sampleLowerBody(preset.id, progress).left.flexion;
             motionFlexion.current = angle;
             if (now - lastUpdate >= 100) {
                 setFlexion(Math.round(angle));
@@ -1147,16 +1156,21 @@ export default function App() {
           <div className="motion-copy" data-reveal>
             <p className="kicker">{t("MOTION LAB")}</p>
             <h2>{t("Move it.")}<br />{t("See it respond.")}</h2>
-            <p>{t("This simplified motion view stays locked to one side and isolates flexion in a single plane. Adjust the live model while keeping its tissues, angle and viewing tools in sight.")}</p>
+            <p>{t("Explore how both legs coordinate at the hips, knees and ankles. Compare planted-foot squats, alternating walking steps and a step-up with a controlled return.")}</p>
           </div>
 
           <div className="motion-workbench" data-reveal style={{ "--motion-angle": `${Math.max(4, (flexion / 130) * 78)}deg` } as React.CSSProperties}>
             <div className="motion-visual">
               <div className="motion-visual-head">
                 <span><i aria-hidden="true"/>{t(" LIVE MODEL")}</span>
-                <span>{t("FIXED SIDE VIEW")}</span>
+                <span>{t(motionView === "body" ? "BOTH LEGS · HIP TO FOOT" : "ISOLATED KNEE")}</span>
+              </div>
+              <div className="motion-view-tabs" role="group" aria-label={t("Movement view")}>
+                <button type="button" aria-pressed={motionView === "body"} onClick={() => setMotionView("body")}>{t("Both legs")}</button>
+                <button type="button" aria-pressed={motionView === "knee"} onClick={() => { setMotionView("knee"); setMovementId("manual"); }}>{t("Knee detail")}</button>
               </div>
               <div className="motion-canvas" aria-label={t("Live knee flexion model")}>
+                {motionView === "body" ? <LowerBodyMotion activity={movementId} phaseRef={motionPhase} manualAngle={flexion} reducedMotion={performanceMode === "reduced"} /> : <>
                 <Scene selected={selected} selectedEntity={selectedEntity} xray={xray} exploded={exploded} flexion={flexion} flexionSource={motionFlexion} muscleScope={muscleScope} onSelect={selectLayer} onEntitySelect={selectEntity} onHover={setHovered} viewRotation={-Math.PI / 2} stableView lockRotation showMotionGhost={false} showLabels={showLabels} tensionMap={tensionMap} aclState={aclState}/>
 
                 <div className="orbit-hint" aria-hidden="true">{t("FIXED VIEW\u00A0\u00A0 / \u00A0\u00A0WHEEL \u00B7 ZOOM")}</div>
@@ -1164,6 +1178,7 @@ export default function App() {
                   <span>{t(flexion)}{t("\u00B0")}</span>
                 </div>
                 {hovered && <div className="motion-hover-label">{t(hovered)}</div>}
+                </>}
               </div>
             </div>
 
@@ -1176,6 +1191,7 @@ export default function App() {
                 <div className="preset-options" role="group" aria-label={t("Choose a movement preset")}>
                   {movementPresets.map((preset) => (<button key={preset.id} type="button" className={movementId === preset.id ? "active" : ""} onClick={() => {
                 setMovementId(preset.id);
+                        if (preset.id !== "manual") setMotionView("body");
             }}>
                       {t(preset.label)}
                     </button>))}
@@ -1186,7 +1202,7 @@ export default function App() {
                 <span>{t(String(flexion).padStart(3, "0"))}</span>
                 <sup>{t("\u00B0")}</sup>
               </div>
-              <label htmlFor="flexion-range">{t("Knee flexion")}</label>
+              <label htmlFor="flexion-range">{t(motionView === "body" ? "Left knee flexion" : "Knee flexion")}</label>
               <input id="flexion-range" type="range" min="0" max="130" step="1" value={flexion} onChange={(event) => {
             setMovementId("manual");
             const angle = Number(event.target.value);
@@ -1198,6 +1214,7 @@ export default function App() {
                 <span>{t("DEEP FLEXION")}</span>
               </div>
 
+              {motionView === "knee" && <>
               <div className="motion-control-group">
                 <p>{t("Visible tissue")}</p>
                 <div className="motion-layer-options" role="group" aria-label={t("Choose tissue in live motion model")}>
@@ -1258,9 +1275,10 @@ export default function App() {
                   <p>{t("Colour shows a flexion-based trend only, not measured force. Real loading depends on combined forces and movement.")}</p>
                 </div>)}
 
+              </>}
               <p className="motion-state">
                 <span>{t(flexion < 15 ? "Near full extension" : flexion < 70 ? "Functional flexion" : "Deep flexion")}</span>
-                <span>{t(activeEntity?.shortLabel ?? structureByKey[selected].label)}</span>
+                <span>{t(motionView === "body" ? "Both legs" : activeEntity?.shortLabel ?? structureByKey[selected].label)}</span>
               </p>
             </div>
           </div>

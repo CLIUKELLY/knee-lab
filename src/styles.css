@@ -475,3 +475,27 @@ html[lang="zh-CN"] .hero-copy h1 { line-height: 1.05; letter-spacing: -.03em; }
 .acl-references ul { margin: 10px 0 0; padding-left: 24px; }
 .acl-references li { margin: 8px 0; }
 .acl-references a { text-decoration: underline; text-underline-offset: 4px; }
+
+.motion-view-tabs { position: absolute; top: 64px; left: 18px; z-index: 6; display: flex; gap: 8px; }
+.motion-view-tabs button { min-height: 42px; padding: 8px 16px; border: 1px solid #8fb5ff66; border-radius: 5px; background: #0a1224ed; color: #bdcce8; cursor: pointer; font-size: .9rem; }
+.motion-view-tabs button[aria-pressed="true"] { color: #fff; border-color: #8fb5ff; background: #233454; }
+.lower-body-view { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 108px 14px 12px; z-index: 3; color: #dce3f5; }
+.lower-body-scene { min-height: 310px; flex: 1; position: relative; }
+.lower-body-scene > div { position: absolute !important; inset: 0; }
+.lower-body-diagram { display: block; width: 100%; height: 100%; max-height: 520px; }
+.lower-body-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; font-size: 1rem; }
+.lower-body-status button { border: 1px solid #8fb5ff66; background: #101a30; color: #c6d8f5; padding: 8px 12px; min-height: 40px; cursor: pointer; font-size: .9rem; }
+.lower-body-legs { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 18px; padding: 8px 12px; font-size: .95rem; }
+.lower-body-note { margin: 6px 12px; color: #adbfdf; font-size: .875rem; line-height: 1.6; }
+@media(max-width:1100px) { .motion-visual { min-height: 700px; } }
+@media(max-width:680px) {
+  .motion-visual { min-height: 620px; position: relative; }
+  .motion-canvas { min-height: 568px; }
+  .lower-body-view { padding: 108px 8px 8px; }
+  .lower-body-status { font-size: .9rem; padding: 8px; }
+  .lower-body-legs { font-size: .875rem; padding: 8px; }
+  .lower-body-diagram text { font-size: 24px; }
+  .motion-view-tabs { left: 12px; }
+}
+
+@media(max-width:680px) { .lower-body-scene { min-height: 260px; } }

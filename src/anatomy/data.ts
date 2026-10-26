@@ -110,7 +110,7 @@ export type MovementPreset = {
 
 export const movementPresets: MovementPreset[] = [
   { id: "manual", label: "Manual", keyframes: [], duration: 0, description: "Drag the control to inspect any flexion angle." },
-  { id: "walking", label: "Walking", keyframes: [5, 18, 60, 35, 8], duration: 3200, description: "A simplified educational flexion cycle—not a gait analysis." },
-  { id: "squat", label: "Squat", keyframes: [5, 30, 65, 100, 125, 90, 45, 5], duration: 5200, description: "A simplified descent and return through deep flexion." },
-  { id: "stairs", label: "Stairs", keyframes: [8, 35, 75, 45, 12], duration: 3600, description: "A simplified step-up flexion pattern—not measured loading." },
+  { id: "walking", label: "Walking", keyframes: [5, 18, 60, 35, 8], duration: 3200, description: "Alternating stance and swing with coordinated hip, knee and ankle motion." },
+  { id: "squat", label: "Squat", keyframes: [5, 30, 65, 100, 125, 90, 45, 5], duration: 5200, description: "Both feet stay planted as the hips lower and the thighs and shins rotate." },
+  { id: "stairs", label: "Stairs", keyframes: [8, 35, 75, 45, 12], duration: 3600, description: "Left foot leads onto a step, the pelvis rises, and the right foot follows; then return." },
 ];
