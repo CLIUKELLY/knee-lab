@@ -1,12 +1,12 @@
 import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { sampleLowerBody, THIGH, SHIN, STEP_HEIGHT, type Activity, type LowerBodyPose, type Point2 } from "../anatomy/lowerBody";
+import { sampleLowerBody, THIGH, SHIN, STEP_HEIGHT, WALK_STRIDE, type Activity, type LowerBodyPose, type Point2 } from "../anatomy/lowerBody";
 import { useLanguage } from "../i18n/Language";
 import { useVisibleCanvas } from "../hooks/useVisibleCanvas";
 type Props = { activity: Activity; phaseRef: { current: number }; manualAngle: number; reducedMotion: boolean };
 const leftColor = '#8fb5ff', rightColor = '#f0cf86';
-const beltGridSpacing = (0.48 / 0.62) / 4;
+const beltGridSpacing = (WALK_STRIDE / 0.62) / 4;
 const position = (p: Point2, side: number) => new THREE.Vector3(side * 0.16, p.height, p.forward);
 class RigBoundary extends Component<{children: ReactNode; fallback: ReactNode}, {failed:boolean}> {
   state={failed:false};

@@ -4,6 +4,7 @@ export const THIGH = 0.44;
 export const SHIN = 0.43;
 export const ANKLE_HEIGHT = 0.08;
 export const STEP_HEIGHT = 0.18;
+export const WALK_STRIDE = 0.36;
 const clamp = (x: number, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const smooth = (x: number) => { const t = clamp(x); return t * t * t * (10 + t * (-15 + 6 * t)); };
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -34,19 +35,21 @@ export function sampleLowerBody(activity: Activity, progress: number, manualAngl
     return { ...pose, phase, phaseLabel: activity === "manual" ? "Both feet planted" : phase < 0.5 ? "Lowering · feet planted" : "Rising · feet planted", beltOffset: 0 };
   }
   if (activity === "walking") {
-    const hip = { forward: 0, height: 0.875 + 0.012 * Math.cos(4 * Math.PI * phase) };
     const foot = (p: number) => {
       const stance = p < 0.62;
       const swing = (p - 0.62) / 0.38;
       // Body-relative stance moves back at belt speed; swing returns the foot.
-      const velocity = -0.48 / 0.62 * 0.38;
+      const velocity = -WALK_STRIDE / 0.62 * 0.38;
       const h = swing * swing * (3 - 2 * swing);
-      const forward = stance ? 0.24 - 0.48 * p / 0.62 : mix(-0.24, 0.24, h) + velocity * (2*swing**3 - 3*swing**2 + swing);
-      const height = ANKLE_HEIGHT + (stance ? 0 : 0.18 * Math.sin(Math.PI * swing) ** 2);
-      return solveLeg(hip, { forward, height }, stance);
+      const forward = stance ? WALK_STRIDE / 2 - WALK_STRIDE * p / 0.62 : mix(-WALK_STRIDE / 2, WALK_STRIDE / 2, h) + velocity * (2*swing**3 - 3*swing**2 + swing);
+      const height = ANKLE_HEIGHT + (stance ? 0 : 0.11 * Math.sin(Math.PI * swing) ** 2);
+      return { ankle: { forward, height }, stance };
     };
-    return { hip, left: foot(phase), right: foot((phase + 0.5) % 1), phase,
-      phaseLabel: "Alternating stance & swing", beltOffset: phase * 0.48 / 0.62 };
+    const left = foot(phase), right = foot((phase + 0.5) % 1);
+    const reach = Math.sqrt(left.ankle.forward**4 + right.ankle.forward**4);
+    const hip = { forward: 0, height: ANKLE_HEIGHT + Math.sqrt(0.864**2 - reach) };
+    return { hip, left: solveLeg(hip, left.ankle, left.stance), right: solveLeg(hip, right.ankle, right.stance), phase,
+      phaseLabel: "Alternating stance & swing", beltOffset: phase * WALK_STRIDE / 0.62 };
   }
   // A single step-up and return: the lead foot plants before the pelvis rises.
   const up = (1 - Math.cos(phase * 2 * Math.PI)) / 2;
