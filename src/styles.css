@@ -406,3 +406,98 @@ footer a:hover { color: var(--mint); }
 .acl-source-grid p.acl-source-meta { color: #8694b4; font-size: .7rem; }
 .acl-source-grid a { display: block; color: #8fb5ff; font-size: .75rem; line-height: 1.8; margin-top: 8px; overflow-wrap: anywhere; }
 @media(max-width:760px) { .acl-source-grid { grid-template-columns: 1fr; } }
+
+/* Reading comfort: readable type, strong contrast and a calmer hierarchy. */
+:root { --muted: #b8c2d7; }
+body { font-size: 17px; }
+.topbar nav { font-size: 1rem; gap: 24px; color: #c7d0e4; }
+.header-tools { justify-self: end; display: flex; align-items: center; gap: 18px; }
+.edition { font-size: .75rem; color: #aab7d1; }
+.language-toggle { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; padding: 8px 14px; border: 1px solid #8fb5ff66; border-radius: 7px; color: #aebad2; background: #10172b; cursor: pointer; font-size: .95rem; white-space: nowrap; }
+.language-toggle .is-selected { color: #fff; font-weight: 650; }
+.kicker { font-size: .85rem; letter-spacing: .12em; line-height: 1.6; }
+.intro, .motion-copy > p:last-child, .acl-heading > p { font-size: 1.125rem; line-height: 1.8; max-width: 56ch; }
+.intro { color: #c2cbe0; }
+.mouse-hint, .hover-label, .model-loading, .motion-hover-label { font-size: .875rem; color: #b9c9e8; }
+.structure-panel { max-width: 330px; }
+.structure-panel > p:first-child { font-size: .8rem; }
+.panel-description, .panel-fact { font-size: 1rem; line-height: 1.8; color: #c0cbe1; }
+.origin-disclaimer span, .entity-evidence dt { font-size: .8rem; }
+.origin-disclaimer p, .entity-evidence dd { font-size: .95rem; line-height: 1.75; color: #b8c5df; }
+.entity-evidence a, .entity-evidence > span { font-size: .875rem; line-height: 1.7; color: #b8c5df; }
+.entity-picker button { min-height: 40px; padding: 8px 12px; font-size: .875rem; }
+.structure-tabs button, .view-tools button { font-size: 1rem; min-height: 46px; }
+.tab-index { font-size: .8rem; color: #a0aec9; }
+.motion-visual-head, .orbit-hint { font-size: .85rem; color: #b9c7e4; }
+.anatomy-label { font-size: .85rem; }
+.motion-control label, .motion-control-group > p, .injury-head p { font-size: .95rem; color: #38455f; letter-spacing: .04em; }
+.preset-options { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+.preset-options button, .injury-options button, .scope-options button, .motion-layer-options button, .motion-tool-row button { font-size: .9rem; min-height: 44px; line-height: 1.4; }
+.movement-presets > p, .injury-note, .muscle-scope-control > p, .tension-legend p { font-size: 1rem; line-height: 1.75; color: #4c5973; }
+.injury-head span, .tension-legend > span, .range-scale { font-size: .8rem; letter-spacing: .04em; }
+.range-scale, .tension-legend > span { color: #4c5973; }
+.layer-hud { font-size: .85rem; color: #b5c2df; }
+.layer-hud strong { font-size: 1rem; }
+.anatomy-grid article { opacity: 1; }
+.anatomy-grid article.is-current { box-shadow: inset 3px 0 #8fb5ff; }
+.anatomy-grid p { font-size: 1.125rem; line-height: 1.8; color: #c0cbe1; max-width: 52ch; }
+.material-swatch span { font-size: .85rem; color: #b7c7e4; }
+.anatomy-grid button, .quiz-result { font-size: 1rem; }
+footer { font-size: .95rem; line-height: 1.7; color: #acbad5; }
+.acl-heading { align-items: center; }
+.acl-heading h2 { font-size: clamp(2.7rem,4.6vw,4.5rem); line-height: 1.12; letter-spacing: -.04em; }
+.acl-layout { grid-template-columns: minmax(0,1.35fr) minmax(340px,1fr); }
+.acl-controls { padding: clamp(24px,3vw,40px); }
+.acl-controls label { font-size: 1.0625rem; margin-bottom: 18px; }
+.acl-results span { font-size: .875rem; letter-spacing: .08em; }
+.acl-results p { font-size: .95rem; line-height: 1.6; }
+.acl-range { font-size: .8rem; color: #b6c3dc; }
+.acl-key, .acl-caption { font-size: .875rem; line-height: 1.8; color: #b7c6e2; padding: 0 24px; }
+.acl-readouts p { font-size: 1rem; line-height: 1.65; margin: 16px 0; color: #c2cde2; flex-wrap: wrap; }
+.acl-readouts strong { margin-left: auto; }
+.acl-view-switch button, .acl-reset { font-size: .95rem; min-height: 44px; padding: 10px 16px; }
+.acl-observation { font-size: 1rem; line-height: 1.8; color: #bdc9e1; }
+.acl-science-note { padding: 26px 30px; font-size: 1.0625rem; line-height: 1.8; }
+.acl-science-note > p { max-width: 85ch; }
+.acl-science-note strong { display: block; font-size: 1.2rem; line-height: 1.5; }
+.acl-evidence-status { font-size: .95rem; line-height: 1.8; }
+.acl-bottom { gap: 32px; margin-top: 36px; }
+.acl-bottom details { font-size: 1rem; line-height: 1.8; padding: 24px; color: #c1cde3; }
+.acl-bottom details p { max-width: 65ch; }
+.acl-bottom summary { font-size: 1.05rem; font-weight: 550; }
+.acl-output-label { font-size: .8rem; line-height: 1.7; color: #b2c1dd; }
+.acl-chart-key { font-size: .95rem; flex-wrap: wrap; }
+.acl-chart { max-height: 310px; }
+.acl-chart text { font-size: 14px; fill: #c0cde6; }
+.acl-diagram text { font-size: 18px; }
+.acl-fallback { font-size: .875rem; color: #bacff2; }
+.acl-evidence-heading { max-width: 76ch; }
+.acl-evidence-heading h3 { font-size: 2rem; line-height: 1.3; }
+.acl-evidence-heading > p:last-child { font-size: 1.125rem; line-height: 1.8; color: #c0cbe2; }
+.acl-source-grid { gap: 24px; margin-top: 32px; }
+.acl-source-grid article { padding: clamp(24px,3vw,36px); display: flex; flex-direction: column; gap: 4px; }
+.acl-source-grid article > span { font-size: .8rem; letter-spacing: .06em; line-height: 1.6; }
+.acl-source-grid h4 { font-size: 1.3rem; line-height: 1.4; margin: 14px 0 8px; }
+.acl-source-grid p { font-size: 1.0625rem; line-height: 1.8; color: #c3cee4; max-width: 65ch; margin: 10px 0; }
+.acl-source-grid p.acl-source-meta { font-size: .9rem; line-height: 1.75; color: #aebeda; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px; }
+.acl-source-grid a { font-size: 1rem; line-height: 1.65; min-height: 40px; padding: 6px 0; text-decoration: underline; text-underline-offset: 4px; }
+.acl-source-details { margin: 8px 0; color: #b4c9ed; }
+.acl-source-details summary { cursor: pointer; font-size: .95rem; line-height: 1.7; padding: 8px 0; }
+html[lang="zh-CN"] .kicker, html[lang="zh-CN"] button { letter-spacing: .02em; }
+html[lang="zh-CN"] .hero-copy h1 { line-height: 1.05; letter-spacing: -.03em; }
+@media(max-width:1100px) { .header-tools .edition { display: none; } .acl-layout { grid-template-columns: 1fr; } .acl-controls { border-left: 0; border-top: 1px solid var(--line); } }
+@media(max-width:760px) {
+  .acl-bottom { grid-template-columns: 1fr; }
+  .acl-science-note { padding: 22px; }
+  .acl-source-grid { grid-template-columns: 1fr; gap: 18px; }
+  .acl-chart text { font-size: 20px; }
+  .acl-diagram text { font-size: 26px; }
+  .acl-heading h2 { font-size: 2.8rem; }
+  .acl-heading > p { font-size: 1.0625rem; }
+  .acl-key, .acl-caption { text-align: left; }
+  .acl-readouts p { gap: 6px 18px; }
+  .language-toggle { font-size: .9rem; }
+  .motion-visual-head { font-size: .8rem; }
+  .anatomy-label { font-size: .8rem; }
+  .structure-tabs button { font-size: 1rem; }
+}
