@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { Component, type ReactNode, Suspense, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Html, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -60,6 +60,39 @@ function TrialModel({ flexion, result, intact, offset }: { flexion: number; resu
   </group>;
 }
 
+class ModelBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+}
+
+function Diagram({ flexion, intact, torn }: { flexion: number; intact: Trial; torn: Trial }) {
+  const project = (point: THREE.Vector3) => ({ x: 145 + (point.z - pivot.z) * 1300, y: 125 - (point.y - pivot.y) * 1300 });
+  const start = project(aclOrigin);
+  const base = project(attachmentAt(flexion));
+  return <svg viewBox="0 0 600 280" className="acl-diagram" role="img" aria-label="Schematic side view: ACL landmarks follow flexion and tibial translation. Bone outlines are illustrative.">
+    <defs><marker id="acl-pull-tip" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#69d2ff" /></marker></defs>
+    {[intact, torn].map((result, index) => {
+      const end = project(attachmentAt(flexion, result.displacement));
+      const shift = pullDirection(flexion).multiplyScalar(result.displacement * 1.3);
+      const color = index === 0 ? '#f0cf86' : '#ff7794';
+      const mid = {x: start.x+(end.x-start.x)*0.4,y:start.y+(end.y-start.y)*0.4};
+      const tip = {x: start.x+(end.x-start.x)*0.62,y:start.y+(end.y-start.y)*0.62};
+      return <g key={index} transform={`translate(${index * 300},0)`}>
+        <path d="M118 15 L118 76 C96 91 105 123 127 125 C145 131 152 113 165 122 C188 125 198 101 176 80 L171 15" fill="#b7c4e321" stroke="#b7c4e3" strokeWidth="2" />
+        <g transform={`translate(${shift.z},${-shift.y}) rotate(${flexion},145,125)`}>
+          <path d="M106 137 Q145 127 187 138 L179 166 L165 169 L164 260 L123 260 L121 170 L108 166 Z" fill="#b7c4e321" stroke="#b7c4e3" strokeWidth="2" />
+        </g>
+        <circle cx={base.x} cy={base.y} r="6" fill="none" stroke="#8fb5ff" strokeDasharray="2 2" />
+        {index===0 ? <path d={`M${start.x},${start.y} L${end.x},${end.y}`} stroke={color} strokeWidth="7" strokeLinecap="round" /> : <path d={`M${start.x},${start.y} L${mid.x},${mid.y} M${tip.x},${tip.y} L${end.x},${end.y}`} stroke={color} strokeWidth="7" strokeLinecap="round" />}
+        {[start,end].map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="5" fill={color} stroke="#080c1b" />)}
+        <line x1="210" y1="155" x2={210+35*Math.cos(flexion*Math.PI/180)} y2={155+35*Math.sin(flexion*Math.PI/180)} stroke="#69d2ff" strokeWidth="2" markerEnd="url(#acl-pull-tip)" />
+        <text x="25" y="45" fill="#aab5cf" fontSize="10">FEMUR</text><text x="210" y="230" fill="#aab5cf" fontSize="10">TIBIA</text>
+      </g>;
+    })}
+  </svg>;
+}
+
 function ForceChart({ flexion, force, intact, torn }: { flexion: number; force: number; intact: Trial; torn: Trial }) {
   const x = (f: number) => 42 + f / 150 * 470;
   const y = (d: number) => 190 - d / 16 * 162;
@@ -75,6 +108,7 @@ function ForceChart({ flexion, force, intact, torn }: { flexion: number; force: 
 }
 
 export default function AclExperiment() {
+  const [view, setView] = useState<"3d" | "diagram">("3d");
   const [force, setForce] = useState(80);
   const [flexion, setFlexion] = useState(20);
   const { ref, visible } = useVisibleCanvas("200px");
@@ -85,14 +119,15 @@ export default function AclExperiment() {
     <div className="acl-heading"><div><p className="kicker">STABILITY LAB / EXPERIMENT 01</p><h2>Same pull.<br />Different restraint.</h2></div><p>Hold the femur still. Pull the tibia forward. Explore how an intact ACL adds restraint, and how its attachments move with knee flexion.</p></div>
     <div className="acl-layout"><div className="acl-visual">
       <div className="acl-results">{[{ label: "INTACT ACL", trial: intact, className: "intact" }, { label: "TORN ACL", trial: torn, className: "torn" }].map(item => <div key={item.label} className={item.className}><span>{item.label}</span><strong>{item.trial.displacement.toFixed(1)}<small> mm</small></strong><p>Anterior displacement</p></div>)}</div>
+      <div className="acl-view-switch" role="group" aria-label="Experiment view"><button type="button" aria-pressed={view === "3d"} onClick={() => setView("3d")}>3D anatomy</button><button type="button" aria-pressed={view === "diagram"} onClick={() => setView("diagram")}>2D diagram</button></div>
       <div ref={ref} className="acl-canvas" role="img" aria-label="Side-by-side educational 3D comparison of intact and torn ACL under the same anterior pull">
-        {visible && <Canvas orthographic camera={{ position: [0, 0, 6], zoom: 100, near: 0.1, far: 30 }} dpr={[1, 1.5]} gl={{ antialias: true, localClippingEnabled: true }} frameloop="demand">
+        {view === "diagram" ? <Diagram flexion={flexion} intact={intact} torn={torn} /> : visible && <ModelBoundary fallback={<><p className="acl-fallback">3D unavailable on this device · Showing a schematic</p><Diagram flexion={flexion} intact={intact} torn={torn} /></>}><Canvas orthographic camera={{ position: [0, 0, 6], zoom: 100, near: 0.1, far: 30 }} dpr={[1, 1.5]} gl={{ antialias: true, localClippingEnabled: true }} frameloop="demand">
           <ambientLight intensity={1.5} /><directionalLight position={[2, 3, 5]} intensity={2} />
           <Suspense fallback={<Html center>Preparing experiment…</Html>}><TrialModel flexion={flexion} result={intact} intact offset={-1} /><TrialModel flexion={flexion} result={torn} intact={false} offset={1} /></Suspense>
-        </Canvas>}
+        </Canvas></ModelBoundary>}
       </div>
       <p className="acl-key">● Attachment landmarks · <span>○ Unloaded tibial landmark</span> · Cyan arrow: anterior pull</p>
-      <p className="acl-caption">Femur fixed · Same flexion and force · Joint detail cropped for visibility</p>
+      <p className="acl-caption">Femur fixed · Same flexion and force · Joint detail cropped · Diagram outlines are schematic</p>
     </div><div className="acl-controls">
       <label htmlFor="acl-force">Anterior pull <strong>{force} N</strong></label><input id="acl-force" type="range" min="0" max="150" step="1" value={force} onChange={e => setForce(Number(e.target.value))} /><div className="acl-range"><span>NO PULL</span><span>150 N</span></div>
       <label htmlFor="acl-flexion">Knee flexion <strong>{flexion}°</strong></label><input id="acl-flexion" type="range" min="0" max="60" step="1" value={flexion} onChange={e => setFlexion(Number(e.target.value))} /><div className="acl-range"><span>EXTENDED</span><span>60°</span></div>
