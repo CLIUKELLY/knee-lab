@@ -389,23 +389,7 @@ footer a:hover { color: var(--mint); }
 .acl-diagram { width: 100%; height: 100%; max-height: 300px; display: block; }
 .acl-fallback { font-size: .65rem; text-align: center; color: #8fb5ff; padding-top: 8px; margin: 0; }
 .acl-fallback + .acl-diagram { height: calc(100% - 30px); }
-.acl-science-note { border-left: 2px solid #69d2ff; background: #69d2ff08; padding: 18px 22px; margin-bottom: 26px; color: #aab5cf; font-size: .8rem; line-height: 1.8; }
-.acl-science-note strong { color: #e5edff; font-weight: 500; }
-.acl-science-note a { color: #8fb5ff; }
-.acl-evidence-status { color: #f0cf86; font-size: .73rem; margin-bottom: 0; }
 .acl-output-label { color: #8a97b5; font: .6rem monospace; letter-spacing: .07em; margin: 0 0 8px 8%; }
-.acl-evidence { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 32px; }
-.acl-evidence-heading { max-width: 760px; }
-.acl-evidence-heading h3 { font-size: 1.7rem; margin: 12px 0; }
-.acl-evidence-heading > p:last-child { color: #aab5cf; font-size: .85rem; line-height: 1.8; }
-.acl-source-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin-top: 24px; }
-.acl-source-grid article { padding: 24px; border: 1px solid var(--line); background: #080c1b; }
-.acl-source-grid article > span { font: .6rem monospace; letter-spacing: .08em; color: #8fb5ff; }
-.acl-source-grid h4 { color: #e5edff; font-size: 1rem; margin: 14px 0; }
-.acl-source-grid p { color: #aab5cf; font-size: .8rem; line-height: 1.8; }
-.acl-source-grid p.acl-source-meta { color: #8694b4; font-size: .7rem; }
-.acl-source-grid a { display: block; color: #8fb5ff; font-size: .75rem; line-height: 1.8; margin-top: 8px; overflow-wrap: anywhere; }
-@media(max-width:760px) { .acl-source-grid { grid-template-columns: 1fr; } }
 
 /* Reading comfort: readable type, strong contrast and a calmer hierarchy. */
 :root { --muted: #b8c2d7; }
@@ -457,10 +441,6 @@ footer { font-size: .95rem; line-height: 1.7; color: #acbad5; }
 .acl-readouts strong { margin-left: auto; }
 .acl-view-switch button, .acl-reset { font-size: .95rem; min-height: 44px; padding: 10px 16px; }
 .acl-observation { font-size: 1rem; line-height: 1.8; color: #bdc9e1; }
-.acl-science-note { padding: 26px 30px; font-size: 1.0625rem; line-height: 1.8; }
-.acl-science-note > p { max-width: 85ch; }
-.acl-science-note strong { display: block; font-size: 1.2rem; line-height: 1.5; }
-.acl-evidence-status { font-size: .95rem; line-height: 1.8; }
 .acl-bottom { gap: 32px; margin-top: 36px; }
 .acl-bottom details { font-size: 1rem; line-height: 1.8; padding: 24px; color: #c1cde3; }
 .acl-bottom details p { max-width: 65ch; }
@@ -471,25 +451,11 @@ footer { font-size: .95rem; line-height: 1.7; color: #acbad5; }
 .acl-chart text { font-size: 14px; fill: #c0cde6; }
 .acl-diagram text { font-size: 18px; }
 .acl-fallback { font-size: .875rem; color: #bacff2; }
-.acl-evidence-heading { max-width: 76ch; }
-.acl-evidence-heading h3 { font-size: 2rem; line-height: 1.3; }
-.acl-evidence-heading > p:last-child { font-size: 1.125rem; line-height: 1.8; color: #c0cbe2; }
-.acl-source-grid { gap: 24px; margin-top: 32px; }
-.acl-source-grid article { padding: clamp(24px,3vw,36px); display: flex; flex-direction: column; gap: 4px; }
-.acl-source-grid article > span { font-size: .8rem; letter-spacing: .06em; line-height: 1.6; }
-.acl-source-grid h4 { font-size: 1.3rem; line-height: 1.4; margin: 14px 0 8px; }
-.acl-source-grid p { font-size: 1.0625rem; line-height: 1.8; color: #c3cee4; max-width: 65ch; margin: 10px 0; }
-.acl-source-grid p.acl-source-meta { font-size: .9rem; line-height: 1.75; color: #aebeda; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px; }
-.acl-source-grid a { font-size: 1rem; line-height: 1.65; min-height: 40px; padding: 6px 0; text-decoration: underline; text-underline-offset: 4px; }
-.acl-source-details { margin: 8px 0; color: #b4c9ed; }
-.acl-source-details summary { cursor: pointer; font-size: .95rem; line-height: 1.7; padding: 8px 0; }
 html[lang="zh-CN"] .kicker, html[lang="zh-CN"] button { letter-spacing: .02em; }
 html[lang="zh-CN"] .hero-copy h1 { line-height: 1.05; letter-spacing: -.03em; }
 @media(max-width:1100px) { .header-tools .edition { display: none; } .acl-layout { grid-template-columns: 1fr; } .acl-controls { border-left: 0; border-top: 1px solid var(--line); } }
 @media(max-width:760px) {
   .acl-bottom { grid-template-columns: 1fr; }
-  .acl-science-note { padding: 22px; }
-  .acl-source-grid { grid-template-columns: 1fr; gap: 18px; }
   .acl-chart text { font-size: 20px; }
   .acl-diagram text { font-size: 26px; }
   .acl-heading h2 { font-size: 2.8rem; }
@@ -501,3 +467,11 @@ html[lang="zh-CN"] .hero-copy h1 { line-height: 1.05; letter-spacing: -.03em; }
   .anatomy-label { font-size: .8rem; }
   .structure-tabs button { font-size: 1rem; }
 }
+
+.acl-context { margin: -10px 0 28px; color: #bac8e1; font-size: 1.0625rem; line-height: 1.8; max-width: 72ch; }
+.acl-output-label { margin: 16px 0 0 8%; color: #b5c3dd; font-size: .9375rem; line-height: 1.7; font-family: inherit; letter-spacing: normal; }
+.acl-references { margin-top: 28px; color: #b6c8e7; font-size: 1rem; line-height: 1.8; }
+.acl-references summary { cursor: pointer; width: fit-content; padding: 8px 0; }
+.acl-references ul { margin: 10px 0 0; padding-left: 24px; }
+.acl-references li { margin: 8px 0; }
+.acl-references a { text-decoration: underline; text-underline-offset: 4px; }

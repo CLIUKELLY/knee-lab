@@ -255,5 +255,10 @@
   "Measured loads, joint motion and ligament attachment landmarks.": "实测载荷、关节运动与韧带附着点。",
   "Robotic loading tests at four flexion angles, with specimen geometry and models.": "四个屈膝角度下的机器人加载实验，配有标本几何与模型。",
   "Experimental laxity measurements, processing code and separate simulation results.": "松弛度实验测量、处理代码与单独提供的仿真结果。",
-  "Protocol & limitations": "实验方案与适用范围"
+  "Protocol & limitations": "实验方案与适用范围",
+  "Inspired by the Lachman test, typically performed at 20–30° knee flexion.": "参考 Lachman 试验原理，临床通常在 20–30° 屈膝时进行。",
+  "Illustrative model · Not calibrated to experimental data.": "教学示意模型 · 尚未用实验数据校准。",
+  "References": "参考文献",
+  "Clinical test: Lachman and anterior drawer — diagnostic study (2018) ↗": "临床检查：Lachman 与前抽屉试验——诊断研究（2018）↗",
+  "Biomechanics background: Open Knee — Erdemir (2015) ↗": "生物力学背景：Open Knee——Erdemir（2015）↗"
 }
