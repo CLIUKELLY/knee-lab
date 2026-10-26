@@ -19,6 +19,7 @@ import {
 import { sampleMotion, pivot, moveWithTibia, moveWithPatella, bendStableGeometry } from "./anatomy/motion";
 import { usePerformanceMode } from "./hooks/usePerformanceMode";
 import { useVisibleCanvas } from "./hooks/useVisibleCanvas";
+import AclExperiment from "./components/AclExperiment";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -1232,6 +1233,7 @@ export default function App() {
         <nav aria-label="Primary navigation">
           <a href="#explore">Explore</a>
           <a href="#motion">Motion</a>
+            <a href="#experiment">Experiment</a>
           <a href="#learn">Learn</a>
         </nav>
         <span className="edition">ANATOMY STUDY 001</span>
@@ -1534,6 +1536,8 @@ export default function App() {
             </div>
           </div>
         </section>
+
+        <AclExperiment />
 
         <section id="learn" className="learn-section">
           <div className="learn-heading" data-reveal>

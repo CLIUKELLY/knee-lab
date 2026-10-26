@@ -338,3 +338,48 @@ footer a:hover { color: var(--mint); }
 /* Model overlays are readouts: they must never intercept pointer picking. */
 .hover-label, .motion-hover-label, .orbit-hint, .angle-guide,
 .motion-ghost-key, .layer-hud, .layer-progress { pointer-events: none; }
+
+/* Stability experiment */
+.acl-experiment { padding: 100px max(24px, 6vw); border-top: 1px solid var(--line); scroll-margin-top: 80px; }
+.acl-heading { display: flex; justify-content: space-between; align-items: end; gap: 40px; margin-bottom: 38px; }
+.acl-heading h2 { font-size: clamp(2.5rem, 5vw, 4.8rem); line-height: 1.04; margin: 16px 0 0; letter-spacing: -.05em; }
+.acl-heading > p { max-width: 410px; color: #aab5cf; line-height: 1.8; }
+.acl-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); border: 1px solid var(--line); background: #080c1b; }
+.acl-visual { min-width: 0; background: radial-gradient(ellipse at center, #14213b, #070b18 75%); }
+.acl-results { display: grid; grid-template-columns: 1fr 1fr; padding: 26px 12px 0; text-align: center; }
+.acl-results span { font: .7rem monospace; letter-spacing: .12em; }
+.acl-results strong { display: block; font-size: 2.6rem; margin-top: 8px; font-weight: 500; }
+.acl-results small { font-size: .9rem; }
+.acl-results p { color: #aab5cf; font-size: .75rem; margin: 2px 0; }
+.acl-results .intact, .acl-chart-key span:first-child { color: #f0cf86; }
+.acl-results .torn, .acl-chart-key span:last-child { color: #ff7794; }
+.acl-canvas { height: 330px; width: 100%; }
+.acl-key, .acl-caption { text-align: center; padding: 0 16px; font-size: .7rem; color: #c1cbe1; line-height: 1.6; }
+.acl-key span { color: #8fb5ff; }
+.acl-caption { color: #8290ad; margin-bottom: 22px; }
+.acl-controls { padding: 30px; border-left: 1px solid var(--line); }
+.acl-controls label { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 15px; font-size: .85rem; }
+.acl-controls label strong { color: #69d2ff; font-weight: 500; }
+.acl-controls input { width: 100%; accent-color: #69d2ff; cursor: pointer; }
+.acl-range { display: flex; justify-content: space-between; color: #8a97b5; font: .6rem monospace; margin: 9px 0 30px; }
+.acl-readouts { border-top: 1px solid var(--line); padding-top: 10px; }
+.acl-readouts p { display: flex; justify-content: space-between; gap: 15px; color: #aab5cf; font-size: .75rem; }
+.acl-readouts strong { color: #eeeaf2; font-weight: 400; white-space: nowrap; }
+.acl-reset { margin: 16px 0 4px; padding: 10px 16px; border: 1px solid #8fb5ff66; background: transparent; color: #dce3f5; cursor: pointer; }
+.acl-observation { color: #aab5cf; font-size: .75rem; line-height: 1.7; }
+.acl-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 28px; }
+.acl-chart { display: block; width: 100%; max-height: 280px; }
+.acl-chart text { fill: #aab5cf; font: 11px sans-serif; }
+.acl-chart-key { display: flex; gap: 24px; font-size: .75rem; padding: 8px 0 8px 8%; }
+.acl-bottom details { border: 1px solid var(--line); padding: 20px; align-self: start; font-size: .8rem; color: #aab5cf; line-height: 1.8; }
+.acl-bottom summary { color: #dce3f5; cursor: pointer; }
+.acl-bottom a { color: #8fb5ff; }
+@media (max-width: 760px) {
+  .acl-experiment { padding: 70px 20px; }
+  .acl-heading { display: block; }
+  .acl-heading > p { margin-top: 24px; }
+  .acl-layout, .acl-bottom { grid-template-columns: 1fr; }
+  .acl-controls { border-left: 0; border-top: 1px solid var(--line); padding: 24px; }
+  .acl-canvas { height: 300px; }
+  .acl-results strong { font-size: 2rem; }
+}
