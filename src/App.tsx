@@ -690,6 +690,7 @@ type KneeModelProps = {
   explodeAmount?: number;
   flexion: number;
   flexionSource?: FlexionRef;
+  boneContextOpacity?: number;
   onSelect: (key: StructureKey) => void;
   onEntitySelect: (id: string | null) => void;
   onHover: (label: string | null) => void;
@@ -798,6 +799,7 @@ function KneeModel({
   onEntitySelect,
   onHover,
   viewRotation = -0.2,
+  boneContextOpacity = 0.055,
   showMotionGhost = false,
   showLabels = false,
   tensionMap = false,
@@ -960,7 +962,7 @@ function KneeModel({
 
       const defaultOpacity = category === "cartilage" ? 0.68 : 1;
       const xrayOpacity = category === "bone" ? 0.12 : 0.84;
-      const targetOpacity = !active ? 0.055 : xray ? xrayOpacity : defaultOpacity;
+      const targetOpacity = !active ? (category === "bone" ? boneContextOpacity : 0.055) : xray ? xrayOpacity : defaultOpacity;
       const shouldBeTransparent = !active || xray || category === "cartilage";
       if (material.transparent !== shouldBeTransparent) {
         material.transparent = shouldBeTransparent;
@@ -1126,13 +1128,13 @@ export default function App() {
   const [aclState, setAclState] = useState<AclState>("normal");
   const [muscleScope, setMuscleScope] = useState<MuscleScope>("knee");
   const [layerProgress, setLayerProgress] = useState(0);
+  const [layerIndex, setLayerIndex] = useState(0);
   const [movementId, setMovementId] = useState<MovementPreset["id"]>("manual");
   const performanceMode = usePerformanceMode();
   const active = structureByKey[selected];
   const activeEntity = selectedEntity ? entityById[selectedEntity] : null;
   const activeMovement = movementPresets.find((item) => item.id === movementId) ?? movementPresets[0];
   const layerStructures = structures.slice(1);
-  const layerIndex = Math.min(layerStructures.length - 1, Math.floor(layerProgress * layerStructures.length));
   const layerSelected = layerStructures[layerIndex].key;
 
   useLayoutEffect(() => {
@@ -1150,12 +1152,30 @@ export default function App() {
           },
         );
       });
+      // Match the active tissue to the card at the viewport reading line.
+      // A percentage of the whole section drifts away from the actual cards.
+      const cards = gsap.utils.toArray<HTMLElement>(".anatomy-grid article");
+      const updateLayer = () => {
+        const readingLine = window.innerHeight * 0.6;
+        let closest = 0;
+        let distance = Infinity;
+        cards.forEach((card, index) => {
+          const rect = card.getBoundingClientRect();
+          const nextDistance = Math.abs((rect.top + rect.bottom) / 2 - readingLine);
+          if (nextDistance < distance) { distance = nextDistance; closest = index; }
+        });
+        setLayerIndex(closest);
+      };
       ScrollTrigger.create({
         trigger: ".layer-explorer",
         start: "top 72%",
         end: "bottom 32%",
         scrub: true,
-        onUpdate: (self) => setLayerProgress(Math.round(self.progress * 100) / 100),
+        onUpdate: (self) => {
+          setLayerProgress(self.progress);
+          updateLayer();
+        },
+        onRefresh: updateLayer,
       });
     }, root);
     return () => context.revert();
@@ -1524,6 +1544,9 @@ export default function App() {
             <div className="layer-sticky" aria-label="Scroll-driven exploded knee anatomy">
               <div className="layer-scene">
                 <Scene
+                  stableView
+                  lockRotation
+                  boneContextOpacity={0.3}
                   selected={layerSelected}
                   selectedEntity={null}
                   xray={false}
