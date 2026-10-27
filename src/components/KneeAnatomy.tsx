@@ -722,7 +722,7 @@ export function KneeModel({ selected, selectedEntity, xray, exploded, explodeAmo
                 metalness: 0,
                 clearcoat: category === "bone" ? 0.12 : 0.68,
                 clearcoatRoughness: category === "cartilage" ? 0.14 : 0.3,
-                transmission: category === "bone" ? 0 : category === "cartilage" ? 0.16 : 0.06,
+                transmission: anatomicalSpace ? 0 : category === "bone" ? 0 : category === "cartilage" ? 0.16 : 0.06,
                 thickness: category === "cartilage" ? 0.025 : 0.008,
                 ior: category === "cartilage" ? 1.42 : 1.5,
                 sheen: category === "meniscus" ? 0.42 : 0.12,
@@ -734,7 +734,7 @@ export function KneeModel({ selected, selectedEntity, xray, exploded, explodeAmo
             });
         });
         return cloned;
-    }, [scene, surfaceTextures]);
+    }, [scene, surfaceTextures, anatomicalSpace]);
     const motionGhosts = useMemo(() => {
         if (!showMotionGhost)
             return [];

@@ -140,7 +140,7 @@ function MotionDiagram({pose,activity,anatomy}:{pose:LowerBodyPose;activity:Acti
   </svg>;
 }
 export default function LowerBodyMotion(props:Props){
-  const {t}=useLanguage();const {ref,visible}=useVisibleCanvas('150px');const [diagram,setDiagram]=useState(false);const [frame,setFrame]=useState(0);
+  const {t}=useLanguage();const {ref,visible}=useVisibleCanvas('150px');const [diagram,setDiagram]=useState(false);const [contextLost,setContextLost]=useState(false);const [frame,setFrame]=useState(0);
   useEffect(()=>{
     if(!visible||props.reducedMotion||props.activity==='manual')return;
     let id=0,last=0;const tick=(now:number)=>{if(now-last>=33){setFrame(now);last=now;}id=requestAnimationFrame(tick);};id=requestAnimationFrame(tick);return()=>cancelAnimationFrame(id);
@@ -149,8 +149,8 @@ export default function LowerBodyMotion(props:Props){
   const pose=sampleLowerBody(props.activity,props.phaseRef.current,props.manualAngle);
   const fallback=<MotionDiagram pose={pose} activity={props.activity} anatomy={props.anatomy}/>;
   return <div className="lower-body-view" ref={ref}>
-    <div className="lower-body-scene">{diagram?fallback:visible&&<RigBoundary fallback={fallback}><Canvas orthographic camera={{position:[1.8,1.3,2.7],near:0.1,far:30}} dpr={[1,1.5]}><RigScene {...props}/></Canvas></RigBoundary>}</div>
-    <div className="lower-body-status"><span>{t(pose.phaseLabel)}</span><button type="button" onClick={()=>setDiagram(value=>!value)}>{t(diagram?'3D view':'2D view')}</button></div>
+    <div className="lower-body-scene">{diagram||contextLost?fallback:visible&&<RigBoundary fallback={fallback}><Canvas orthographic camera={{position:[1.8,1.3,2.7],near:0.1,far:30}} dpr={1} gl={{antialias:false, powerPreference:"low-power"}} onCreated={({gl})=>{gl.domElement.addEventListener("webglcontextlost", (event)=>{event.preventDefault();setContextLost(true);}, {once:true});}}><RigScene {...props}/></Canvas></RigBoundary>}</div>
+    <div className="lower-body-status"><span>{t(pose.phaseLabel)}</span><button type="button" onClick={()=>{if(contextLost){setContextLost(false);setDiagram(false);}else setDiagram(value=>!value);}}>{t(diagram||contextLost?'3D view':'2D view')}</button></div>
     <div className="lower-body-legs"><span style={{color:leftColor}}>{t('Left leg')}: {Math.round(pose.left.flexion)}° · {t(pose.left.contact?'Support':'Swing')}</span><span style={{color:rightColor}}>{t('Right leg')}: {Math.round(pose.right.flexion)}° · {t(pose.right.contact?'Support':'Swing')}</span></div>
     <p className="lower-body-note">{t(props.activity==='walking'?'Body-relative walking view · The floor moves beneath the stance foot.':'Detailed knee anatomy on both legs · Pelvis and feet are schematic extensions.')}</p>
   </div>;
