@@ -14,3 +14,14 @@ The ACL, PCL, MCL, LCL, quadriceps tendon, patellar tendon, quadriceps, hamstrin
 These meshes are intentionally simplified for orientation and interaction. They are not segmented patient data, are not suitable for measurement, diagnosis or surgical planning, and are released with the application code under the MIT License.
 
 The educational descriptions in this project are general anatomical explanations and are not medical advice.
+
+## Bilateral movement view
+
+Both legs reuse the same Human Reference Atlas left-knee geometry and the same
+procedural soft-tissue reconstruction, palette, and materials as the knee-detail
+view. One instance is mirrored for the contralateral presentation; it is not an
+independently segmented right knee. The shared anatomy is positioned in a
+schematic hip–knee–ankle movement frame. The pelvic ring and segmented foot bones
+are original procedural illustrations, not MRI/CT-derived anatomical meshes.
+The 2D fallback is an original anatomical illustration with selectable tissue
+layers, not a rendering or tracing of the source segmentation.

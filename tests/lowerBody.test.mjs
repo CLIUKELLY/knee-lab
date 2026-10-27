@@ -44,3 +44,14 @@ test('step-up places both feet on the platform and returns continuously',()=>{
   assert.ok(dist(a.hip,b.hip)<1e-5);assert.ok(dist(a.left.ankle,b.left.ankle)<1e-5);assert.ok(dist(a.right.ankle,b.right.ankle)<1e-5);
  }
 });
+test('detailed knee frame rotates the femur and reconstructs the planted or swinging ankle',()=>{
+ for(const activity of ['walking','squat','stairs'])for(let i=0;i<100;i++){
+  const pose=sampleLowerBody(activity,i/100);
+  for(const leg of [pose.left,pose.right]){
+   const thigh=Math.atan2(leg.hip.forward-leg.knee.forward,leg.hip.height-leg.knee.height);
+   const shin=thigh+leg.flexion*Math.PI/180;
+   const ankle={forward:leg.knee.forward-SHIN*Math.sin(shin),height:leg.knee.height-SHIN*Math.cos(shin)};
+   assert.ok(dist(ankle,leg.ankle)<1e-5);
+  }
+ }
+});
