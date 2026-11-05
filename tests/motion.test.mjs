@@ -66,3 +66,40 @@ test('torn ligament fragments retain the original attachment interval', () => {
   assert.ok(fragmentEnd.distanceTo(moveWithTibia(mid.clone(),90)) > 0.001, 'torn tip must not become a tibial attachment');
   geometry.dispose();
 });
+
+test('bone attachment range governs flexion even when mesh extends past an endpoint', () => {
+  const proximal = new THREE.Vector3(0.146, -0.30, 0.05);
+  const distal = new THREE.Vector3(0.15, -0.36, 0.045);
+  // Simulates a tapered muscle mesh containing a small outlying surface vertex.
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    proximal,
+    proximal.clone().lerp(distal, 0.5),
+    distal,
+    distal.clone().add(new THREE.Vector3(0.005, -0.004, 0)),
+  ]);
+  geometry.userData.motionRange = { top: proximal.y, bottom: distal.y };
+  const attr = geometry.getAttribute('position');
+  for (const angle of [0, 45, 90, 120, 0]) {
+    bendStableGeometry(geometry, angle, 'quadriceps');
+    const actualProximal = new THREE.Vector3().fromBufferAttribute(attr, 0);
+    const actualDistal = new THREE.Vector3().fromBufferAttribute(attr, 2);
+    near(actualProximal.distanceTo(proximal), 0);
+    near(actualDistal.distanceTo(moveWithPatella(distal.clone(), angle)), 0);
+  }
+  geometry.dispose();
+});
+
+test('biceps distal insertion remains attached to tibia/fibula frame at multiple angles', () => {
+  const proximal = new THREE.Vector3(0.19, -0.12, -0.05);
+  const fibularInsertion = new THREE.Vector3(0.206, -0.47, -0.034);
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    proximal, proximal.clone().lerp(fibularInsertion, 0.5), fibularInsertion,
+  ]);
+  geometry.userData.motionRange = { top: proximal.y, bottom: fibularInsertion.y };
+  for (const angle of [0, 45, 90, 120, 0]) {
+    bendStableGeometry(geometry, angle, 'distal');
+    const distal = new THREE.Vector3().fromBufferAttribute(geometry.getAttribute('position'), 2);
+    near(distal.distanceTo(moveWithTibia(fibularInsertion.clone(), angle)), 0);
+  }
+  geometry.dispose();
+});
