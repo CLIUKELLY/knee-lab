@@ -234,6 +234,37 @@ function SoftStrand({ name, points, lowerPoint = true, radius = 0.003, category 
       {isTorn && active && <Sparkles count={12} position={[0.15, -0.418, -0.01]} scale={0.035} size={1.8} speed={0.8} color="#ff5278"/>}
     </group>);
 }
+/** Project a nearby tendon insertion onto the source GLB bone mesh.
+ * Guard against snapping to a distant part when source coordinates change.
+ * Educational approximation; not an anatomically validated attachment map.
+ */
+function anchorToBone(origin: THREE.Vector3, source: THREE.Object3D, bone: string): THREE.Vector3 {
+    source.updateMatrixWorld(true);
+    const maxDistanceSquared = 0.045 ** 2;
+    let best = maxDistanceSquared;
+    const nearest = origin.clone();
+    const candidate = new THREE.Vector3();
+    source.traverse((object) => {
+        if (!(object instanceof THREE.Mesh) || isAnnotation(object.name) ||
+            !object.name.toLowerCase().includes(bone)) return;
+        const positions = object.geometry.getAttribute("position");
+        if (!positions) return;
+        for (let i = 0; i < positions.count; i++) {
+            candidate.fromBufferAttribute(positions, i).applyMatrix4(object.matrixWorld);
+            const distance = candidate.distanceToSquared(origin);
+            if (distance < best) {
+                nearest.copy(candidate);
+                best = distance;
+            }
+        }
+    });
+    if (best === maxDistanceSquared) return origin.clone();
+    const outward = origin.clone().sub(nearest);
+    return nearest.add(outward.lengthSq() > 1e-10
+        ? outward.normalize().multiplyScalar(0.0006)
+        : new THREE.Vector3(0, 0, 0.0006));
+}
+
 type MusclePath = {
     name: string;
     points: [
@@ -413,6 +444,22 @@ const musclePaths: MusclePath[] = [
         scope: "regional",
     },
 ];
+const muscleBoneTargets: Record<string, { first?: string; last?: string }> = {
+    "Rectus femoris": { last: "patella" },
+    "Vastus medialis": { last: "patella" },
+    "Vastus lateralis": { last: "patella" },
+    "Vastus intermedius": { last: "patella" },
+    "Biceps femoris · long head": { last: "fibula" },
+    "Biceps femoris · short head": { last: "fibula" },
+    "Semitendinosus": { last: "tibia" },
+    "Semimembranosus": { last: "tibia" },
+    "Sartorius": { last: "tibia" },
+    "Gracilis": { last: "tibia" },
+    "Medial gastrocnemius": { first: "femur" },
+    "Lateral gastrocnemius": { first: "femur" },
+    "Popliteus": { first: "femur", last: "tibia" },
+    "Plantaris": { first: "femur" },
+};
 function muscleRadiusAt(t: number, radius: number) {
     const belly = Math.pow(Math.max(0, Math.sin(Math.PI * THREE.MathUtils.smoothstep(t, 0.06, 0.94))), 0.8);
     const asymmetry = 0.92 + 0.08 * Math.sin((t - 0.18) * Math.PI);
@@ -531,6 +578,7 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
 }
 function SoftTissues(props: KneeModelProps & {
     renderedFlexion: FlexionRef;
+    boneSource: THREE.Object3D;
 }) {
     const { t } = useLanguage();
     const strands = useMemo<Omit<StrandProps, keyof KneeModelProps | "renderedFlexion">[]>(() => {
@@ -544,9 +592,31 @@ function SoftTissues(props: KneeModelProps & {
             { name: "Patellar tendon", points: [v(0.151, -0.407, 0.044), v(0.153, -0.454, 0.034), v(0.157, -0.505, 0.015)], radius: 0.006 },
         ];
     }, []);
+    const attachedStrands = useMemo(() => strands.map((strand) => {
+        const points = strand.points.map((point) => point.clone()) as StrandProps["points"];
+        if (strand.name === "Quadriceps tendon")
+            points[2] = anchorToBone(points[2], props.boneSource, "patella");
+        if (strand.name === "Patellar tendon") {
+            points[0] = anchorToBone(points[0], props.boneSource, "patella");
+            points[2] = anchorToBone(points[2], props.boneSource, "tibia");
+        }
+        return { ...strand, points };
+    }), [strands, props.boneSource]);
+    const attachedMuscles = useMemo(() => musclePaths.map((muscle) => {
+        const target = muscleBoneTargets[muscle.name];
+        if (!target) return muscle;
+        const points = muscle.points.map((point) => [...point] as [number, number, number]);
+        if (target.first)
+            points[0] = anchorToBone(new THREE.Vector3(...points[0]), props.boneSource, target.first).toArray();
+        if (target.last) {
+            const last = points.length - 1;
+            points[last] = anchorToBone(new THREE.Vector3(...points[last]), props.boneSource, target.last).toArray();
+        }
+        return { ...muscle, points };
+    }), [props.boneSource]);
     return (<group>
-      {strands.map((strand) => <SoftStrand key={strand.name} {...props} {...strand}/>)}
-      {musclePaths
+      {attachedStrands.map((strand) => <SoftStrand key={strand.name} {...props} {...strand}/>)}
+      {attachedMuscles
             .filter((muscle) => muscle.scope !== "regional" || props.muscleScope === "regional")
             .map((muscle) => <MuscleBundle key={muscle.name} {...props} muscle={muscle}/>)}
     </group>);
@@ -882,7 +952,7 @@ export function KneeModel({ selected, selectedEntity, xray, exploded, explodeAmo
             event.stopPropagation();
             onSelect(category);
         }}/>
-          <SoftTissues selected={selected} selectedEntity={selectedEntity} xray={xray} exploded={exploded} explodeAmount={explodeAmount} flexion={flexion} renderedFlexion={renderedFlexion} tensionMap={tensionMap} aclState={aclState} muscleScope={muscleScope} onSelect={onSelect} onEntitySelect={onEntitySelect} onHover={onHover}/>
+          <SoftTissues boneSource={scene} selected={selected} selectedEntity={selectedEntity} xray={xray} exploded={exploded} explodeAmount={explodeAmount} flexion={flexion} renderedFlexion={renderedFlexion} tensionMap={tensionMap} aclState={aclState} muscleScope={muscleScope} onSelect={onSelect} onEntitySelect={onEntitySelect} onHover={onHover}/>
           {showLabels && <AnatomyLabels selected={selected} selectedEntity={selectedEntity} muscleScope={muscleScope} renderedFlexion={renderedFlexion} distanceFactor={anatomicalSpace ? 1.2 : 3}/>}
     </>;
     return <group ref={group} rotation={[0, viewRotation, 0]}>
