@@ -607,10 +607,10 @@ function SoftTissues(props: KneeModelProps & {
         if (!target) return muscle;
         const points = muscle.points.map((point) => [...point] as [number, number, number]);
         if (target.first)
-            points[0] = anchorToBone(new THREE.Vector3(...points[0]), props.boneSource, target.first).toArray();
+            points[0] = anchorToBone(new THREE.Vector3(...points[0]), props.boneSource, target.first).toArray() as [number, number, number];
         if (target.last) {
             const last = points.length - 1;
-            points[last] = anchorToBone(new THREE.Vector3(...points[last]), props.boneSource, target.last).toArray();
+            points[last] = anchorToBone(new THREE.Vector3(...points[last]), props.boneSource, target.last).toArray() as [number, number, number];
         }
         return { ...muscle, points };
     }), [props.boneSource]);
