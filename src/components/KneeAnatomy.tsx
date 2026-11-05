@@ -463,7 +463,9 @@ const muscleBoneTargets: Record<string, { first?: string; last?: string }> = {
 function muscleRadiusAt(t: number, radius: number) {
     const belly = Math.pow(Math.max(0, Math.sin(Math.PI * THREE.MathUtils.smoothstep(t, 0.06, 0.94))), 0.8);
     const asymmetry = 0.92 + 0.08 * Math.sin((t - 0.18) * Math.PI);
-    return radius * (0.09 + belly * 0.91) * asymmetry;
+    // Nearly zero at the bony insertion: the previous 9% minimum left a visibly
+    // rounded, floating muscle stump instead of a thin aponeurotic transition.
+    return radius * (0.018 + belly * 0.982) * asymmetry;
 }
 function createMuscleSurface(curve: THREE.CatmullRomCurve3, radius: number, depth: number) {
     const segments = 56;
@@ -516,6 +518,11 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
         });
         const curve = new THREE.CatmullRomCurve3(points);
         const surface = createMuscleSurface(curve, muscle.radius, muscle.depth);
+        // The skeletal insertion range, not the geometry's bounding-box extrema,
+        // drives attachment motion. This prevents taper and fascicle thickness
+        // from moving an endpoint away from the matching bone during flexion.
+        const motionRange = { top: points[0].y, bottom: points[points.length - 1].y };
+        surface.geometry.userData.motionRange = motionRange;
         const colours: number[] = [];
         const baseColour = new THREE.Color(muscle.color);
         const tendonColour = new THREE.Color("#e6d8bf");
@@ -539,7 +546,9 @@ function MuscleBundle({ muscle, selected, selectedEntity, xray, exploded, explod
                     .add(surface.frames.normals[frameIndex].clone().multiplyScalar(Math.cos(phase) * width))
                     .add(surface.frames.binormals[frameIndex].clone().multiplyScalar(Math.sin(phase) * width * muscle.depth));
             });
-            return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(fibrePoints), 22, Math.max(0.0003, muscle.radius * 0.018), 4, false);
+            const fibre = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(fibrePoints), 22, Math.max(0.0003, muscle.radius * 0.018), 4, false);
+            fibre.userData.motionRange = motionRange;
+            return fibre;
         });
         return { body: surface.geometry, fibres };
     }, [explosion, muscle]);
